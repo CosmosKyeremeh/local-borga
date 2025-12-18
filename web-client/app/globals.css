@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  /* Register your Brand Colors here for Tailwind v4 */
+  --color-gold-500: #D4AF37;
+  --color-blue-black-900: #0B121E;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
