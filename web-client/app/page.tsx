@@ -1,102 +1,75 @@
-// D:\cdm\web\local-borga\web-client\app\page.tsx
+'use client';
+import { useEffect, useState } from 'react';
 
-import React from 'react';
+// Define what a Product looks like for TypeScript
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+  category: string;
+  description: string;
+}
 
-// The main component for the Local Borga Homepage
-export default function HomePage() {
+export default function Home() {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    // Fetching the expanded list from your server
+    fetch('http://localhost:5000/api/products')
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((err) => console.error("Error fetching data:", err));
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      
-      {/* Header/Navigation Placeholder */}
-      <header className="bg-white shadow-md p-4 sticky top-0 z-10">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-green-700">Local Borga</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Shop all your local foods stuffs here.</p>
-        </div>
+    <main className="min-h-screen bg-white p-8 md:p-16">
+      {/* Brand Header - Requirement FE.02 */}
+      <header className="mb-12">
+        <h1 className="text-4xl font-bold text-blue-black-900 mb-2">Local Borga</h1>
+        <div className="h-1 w-20 bg-gold-500"></div>
       </header>
 
-      {/* Main Content Area: The Core Split Section */}
-      <main className="container mx-auto p-4 lg:p-8">
+      {/* Production Section - Requirement FE.04 */}
+      <section className="mb-16 border-2 border-gray-100 rounded-2xl p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <span className="text-2xl">⚙️</span>
+          <h2 className="text-2xl font-bold text-blue-black-900">Custom Milling & Production</h2>
+        </div>
+        <p className="text-gray-600 mb-8">Order custom **Gari, Flours, and Powdered Stuff** milled fresh for you.</p>
         
-        {/* Grid Container for Side-by-Side Layout on Large Screens */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* ====== LEFT SECTION: FRESH GOODS (The Retail Store) ====== */}
-          <section className="bg-white rounded-xl shadow-lg border-t-4 border-yellow-500 p-6">
-            <h2 className="text-2xl font-extrabold text-gray-800 mb-4 flex items-center">
-              🛒 Fresh & Ready Stock
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Quickly shop **Veges, Game, and Oils** available for immediate delivery.
-            </p>
+        {/* The Gold CTA Button */}
+        <button className="bg-gold-500 hover:bg-yellow-600 text-blue-black-900 font-bold py-4 px-8 rounded-xl transition-all uppercase tracking-wide">
+          Build Your Custom Order
+        </button>
+      </section>
 
-            {/* Product Category Cards Placeholder */}
-            <div className="space-y-4">
-              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h3 className="font-semibold text-lg text-gray-700">1. Produce & Food Stuff</h3>
-                <p className="text-sm text-gray-500">Cassava, Plantain, Yam, etc.</p>
-                <a href="#" className="text-sm text-yellow-600 font-medium hover:underline">Browse Veges →</a>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h3 className="font-semibold text-lg text-gray-700">2. Oils & Medicinal Items</h3>
-                <p className="text-sm text-gray-500">Red Oil, Adwe Ngo, Lime, Camwood.</p>
-                <a href="#" className="text-sm text-yellow-600 font-medium hover:underline">Explore Wellness →</a>
-              </div>
-            </div>
-
-            {/* Call to Action */}
-            <button className="mt-8 w-full bg-yellow-600 text-white font-bold py-3 rounded-lg hover:bg-yellow-700 transition duration-200">
-              START FRESH SHOPPING
-            </button>
-          </section>
-          
-          {/* ====== RIGHT SECTION: THE PRODUCTION ROOM (The Unique Service) ====== */}
-          <section className="bg-white rounded-xl shadow-lg border-t-4 border-green-700 p-6">
-            <h2 className="2xl:text-3xl text-2xl font-extrabold text-gray-800 mb-4 flex items-center">
-              ⚙️ Custom Milling & Production
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Order custom **Gari, Flours, and Powdered Stuff** milled fresh for you.
-            </p>
-
-            {/* Live Production Status Interactive Widget (2025 Feature) */}
-            <div className="bg-green-50 p-4 rounded-lg mb-4 border border-green-200">
-              <h3 className="font-semibold text-lg text-gray-700 flex justify-between items-center">
-                <span className="animate-pulse text-green-700">LIVE: 5 Orders In Queue</span>
-                <span className="text-sm text-gray-500">Updated: 10s ago</span>
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Track the journey from raw cassava to packaged flour.
-              </p>
-            </div>
-            
-            {/* Custom Order Form Placeholder */}
-            <div className="space-y-4">
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="font-semibold text-lg text-gray-700">1. Select Product</h3>
-                <p className="text-sm text-gray-500">Custom Gari (Fine/Rough), Flour, Dough Mixes.</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h3 className="font-semibold text-lg text-gray-700">2. Configure Order</h3>
-                <p className="text-sm text-gray-500">Weight (Kg), Texture, Additives.</p>
-              </div>
-            </div>
-            
-            {/* Call to Action */}
-            <button className="mt-8 w-full bg-green-700 text-white font-bold py-3 rounded-lg hover:bg-green-800 transition duration-200">
-              BUILD YOUR CUSTOM ORDER
-            </button>
-          </section>
+      {/* Retail Section (The API Data) - Requirement FE.03 */}
+      <section>
+        <div className="flex items-center gap-3 mb-8">
+          <span className="text-2xl">🛒</span>
+          <h2 className="text-2xl font-bold text-blue-black-900">Fresh & Ready Stock</h2>
         </div>
 
-        {/* Intercontinental Footer Banner */}
-        <div className="mt-8 bg-blue-900 text-white p-6 rounded-xl shadow-xl text-center">
-            <h3 className="text-xl font-bold">🌍 Intercontinental Shipping Available</h3>
-            <p className="text-sm text-blue-300">We package and ship dried/milled goods globally to the diaspora.</p>
+        {/* Responsive Grid - Requirement FE.01 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <div key={product.id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+              <span className="text-xs font-bold text-gold-500 uppercase">{product.category}</span>
+              <h3 className="text-xl font-bold text-blue-black-900 mt-1">{product.name}</h3>
+              <p className="text-gray-500 text-sm mt-2 mb-4">{product.description}</p>
+              <p className="text-lg font-bold text-blue-black-900">${product.price.toFixed(2)}</p>
+              <button className="mt-4 w-full py-2 border border-blue-black-900 text-blue-black-900 rounded-lg hover:bg-blue-black-900 hover:text-white transition-colors">
+                Add to Cart
+              </button>
+            </div>
+          ))}
         </div>
+      </section>
 
-      </main>
-
-    </div>
+      {/* Intercontinental Banner - Requirement FE.05 */}
+      <footer className="mt-20 bg-blue-black-900 text-white p-8 rounded-2xl text-center">
+        <p className="text-xl font-medium">🌍 Intercontinental Shipping Available</p>
+      </footer>
+    </main>
   );
 }
