@@ -11,31 +11,35 @@ app.use(express.json());
 const products = [
   { 
     id: 1, 
-    name: "Premium White Gari", 
-    price: 15.99, 
-    category: "Gari",
-    description: "Fine grained, crispy white gari."
+    name: 'Premium White Gari', 
+    price: 25.00, 
+    category: 'GARI', 
+    description: 'Crispy, dry, and perfectly fermented.',
+    image: '/images/white-gari.jpg' 
   },
   { 
     id: 2, 
-    name: "Yellow Gari (With Oil)", 
-    price: 18.50, 
-    category: "Gari",
-    description: "Rich yellow gari processed with premium palm oil." 
+    name: 'Yellow Gari (Fiber Rich)', 
+    price: 30.00, 
+    category: 'GARI', 
+    description: 'Processed with organic palm oil.',
+    image: '/images/yellow-gari.jpg'
   },
   { 
     id: 3, 
-    name: "Hausa Koko Mix", 
-    price: 12.00, 
-    category: "Flour",
-    description: "Spiced millet flour for authentic breakfast porridge."
+    name: 'Hausa Koko Mix', 
+    price: 15.00, 
+    category: 'FLOUR', 
+    description: 'Spiced millet porridge mix.',
+    image: '/images/hausa-koko.jpg'
   },
   { 
     id: 4, 
-    name: "Fermented Corn Dough", 
-    price: 10.50, 
-    category: "Dough",
-    description: "Perfectly aged for Banku or Kenkey."
+    name: 'Corn Dough (Fermented)', 
+    price: 20.00, 
+    category: 'DOUGH', 
+    description: 'Freshly ground for Banku or Kenkey.',
+    image: '/images/corn-dough.jpg'
   }
 ];
 
