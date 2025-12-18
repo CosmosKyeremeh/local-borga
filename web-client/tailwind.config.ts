@@ -1,25 +1,20 @@
-// local-borga/web-client/tailwind.config.ts
-
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}', // Added standard pages path
     './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}', // Added src path just in case
   ],
   theme: {
     extend: {
       colors: {
-        // --- CUSTOM COLORS
-        'yellow': { // Used for the Fresh Goods (Retail) section
-          500: '#FFD700', // Gold Primary Accent
-          600: '#E6C200', // Gold for hover/buttons
+        'gold': {
+          500: '#D4AF37', 
         },
-        'green': { // Used for the Custom Milling (Service) section
-          700: '#004d40', // Dark Teal/Blue-Black for Service Primary
-        },
-        'blue': { // Used for the Shipping Banner
-          900: '#1a202c', // Very dark blue/charcoal for the banner background
+        'blue-black': {
+          900: '#0B121E', 
         },
       },
     },
