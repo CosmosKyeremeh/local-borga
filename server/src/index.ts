@@ -41,6 +41,30 @@ const products = [
     description: 'Freshly ground for Banku or Kenkey.',
     image: '/images/corn-dough.jpg'
   }
+  { 
+    id: 5, 
+    name: 'Ripened Plantain (Bunch)', 
+    price: 45.00, 
+    category: 'STAPLES', 
+    description: 'Sweet, yellow plantains perfect for Kelewele or boiling.',
+    image: '/images/plantain.jpg' 
+  },
+  { 
+    id: 6, 
+    name: 'Puna Yam (Large)', 
+    price: 35.00, 
+    category: 'STAPLES', 
+    description: 'High-quality Puna yam with a floury texture, ideal for boiling or frying.',
+    image: '/images/yam.jpg'
+  },
+  { 
+    id: 7, 
+    name: 'Palm Nut Pulp', 
+    price: 22.00, 
+    category: 'SOUP BASE', 
+    description: 'Freshly extracted and concentrated palm nut pulp for authentic soup.',
+    image: '/images/palm-nut.jpg'
+  }
 ];
 
 // Routes
