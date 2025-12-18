@@ -52,18 +52,19 @@ This phase focuses on the core user interface, data architecture, and clear sepa
 
 4. # Detailed Requirements
 
-4.1 *Frontend (Web-Client)*
+## 4.1 Frontend (Web-Client)
 
-| ID    | Requirement                                                                                                                 | Status      | Notes                                       |
-| FE.01 | Implement a responsive two-column grid homepage layout (mobile stacked, desktop side-by-side).                              | In Progress | Implemented in page.tsx using Tailwind CSS. |
-| FE.02 | Brand Colors: Use gold-500 for primary CTA backgrounds and blue-black-900 for text/headers.                                 | In Progress | Requires update to tailwind.config.ts.      |
-| FE.03 | Retail Section: Must clearly feature a "Fresh & Ready Stock" heading (🛒) and a primary CTA: "START FRESH SHOPPING."         | ✅ Done      | Placeholder implemented.                    |
-| FE.04 | Production Section: Must feature a "Custom Milling & Production" heading (⚙️) and a primary CTA: "BUILD YOUR CUSTOM ORDER." | ✅ Done      | Placeholder implemented.                    |
-| FE.05 | Intercontinental Banner: Display a prominent, high-contrast banner at the bottom emphasizing "🌍 Intercontinental Shipping." | ✅ Done      | Implemented with bg-blue-black-900.         |
+| ID | Requirement | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **FE.01** | Implement a responsive two-column grid homepage layout (mobile stacked, desktop side-by-side). | 🏗️ In Progress | Implemented in `page.tsx` using Tailwind CSS. |
+| **FE.02** | Brand Colors: Use gold-500 for primary CTA backgrounds and blue-black-900 for text/headers. | 🏗️ In Progress | Requires update to `tailwind.config.ts`. |
+| **FE.03** | Retail Section: Must clearly feature a "Fresh & Ready Stock" heading (🛒) and a primary CTA: "START FRESH SHOPPING." | ✅ Done | Placeholder implemented. |
+| **FE.04** | Production Section: Must feature a "Custom Milling & Production" heading (⚙️) and a primary CTA: "BUILD YOUR CUSTOM ORDER." | ✅ Done | Placeholder implemented. |
+| **FE.05** | Intercontinental Banner: Display a prominent, high-contrast banner at the bottom emphasizing "🌍 Intercontinental Shipping." | ✅ Done | Implemented with `bg-blue-black-900`. |
 
+## 4.2 Backend (Server) & Data
 
-4.2 *Backend (Server) & Data*
-
-| ID	| Requirement |	Status	| Notes |
-| BE.01 |	Database Schema: Finalize and document the four core database tables (Users, Products, Orders, ProductionQueue). |	✅ Done	| Documented in docs/DATABASE_SCHEMA.md. |
-| BE.02 |	Basic API: Create a placeholder (mock data) endpoint for /api/products to simulate product retrieval. |	❌ To Do	| This will be the next task after the homepage is complete. |
+| ID | Requirement | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **BE.01** | Database Schema: Finalize and document the four core database tables (Users, Products, Orders, ProductionQueue). | ✅ Done | Documented in `docs/DATABASE_SCHEMA.md`. |
+| **BE.02** | Basic API: Create a placeholder (mock data) endpoint for `/api/products` to simulate product retrieval. | ✅ Done | Verified live at `http://localhost:5000/api/products`. |
