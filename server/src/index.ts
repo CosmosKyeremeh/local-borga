@@ -40,7 +40,7 @@ const products = [
     category: 'DOUGH', 
     description: 'Freshly ground for Banku or Kenkey.',
     image: '/images/corn-dough.jpg'
-  }
+  },
   { 
     id: 5, 
     name: 'Ripened Plantain (Bunch)', 
