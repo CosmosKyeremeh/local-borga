@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+// Add Link to your imports
+import Link from 'next/link'; 
 import { 
   ShoppingCart, 
   Settings, 
@@ -37,11 +39,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- Search & Filter States ---
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // --- Custom Order States ---
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [customForm, setCustomForm] = useState({
     item: 'Gari',
@@ -66,7 +66,6 @@ export default function Home() {
     fetchProducts();
   }, []);
 
-  // --- Logic: Search & Filter ---
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -75,10 +74,8 @@ export default function Home() {
     return matchesSearch && matchesCategory;
   });
 
-  // --- Logic: Handle Custom Order POST to Backend ---
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     const orderData = {
       itemName: customForm.item,
       millingStyle: customForm.milling,
@@ -115,7 +112,6 @@ export default function Home() {
     }
   };
 
-  // --- Logic: Cart Actions ---
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id && !item.isCustom);
@@ -141,7 +137,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white p-8 md:p-16 max-w-7xl mx-auto relative">
       
-      {/* Floating Cart Indicator */}
       <button 
         onClick={() => setIsCartOpen(true)}
         className="fixed top-8 right-8 z-40 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:bg-amber-500 hover:text-slate-900 transition-all flex items-center gap-2 group"
@@ -154,13 +149,27 @@ export default function Home() {
         )}
       </button>
 
-      {/* Brand Header */}
-      <header className="mb-12">
-        <h1 className="text-4xl font-bold text-slate-900 mb-2 tracking-tight">Local Borga</h1>
-        <div className="h-1.5 w-20 bg-amber-500 rounded-full"></div>
+      {/* UPDATED HEADER SECTION */}
+      <header className="mb-12 flex flex-col items-start gap-4">
+        <div className="flex items-center gap-4">
+          <img 
+            src="/logo.jpg" 
+            alt="Bongr& Logo" 
+            className="h-20 w-auto object-contain" 
+          />
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">
+              Local Borga
+            </h1>
+            <div className="h-1 w-full bg-amber-500 rounded-full mt-1"></div>
+          </div>
+        </div>
+        
+        <Link href="/admin" className="text-[10px] font-black text-slate-400 hover:text-amber-600 uppercase tracking-[0.3em] transition-colors">
+          Command Center
+        </Link>
       </header>
 
-      {/* Custom Milling Section */}
       <section className="mb-12 border-2 border-slate-100 rounded-2xl p-8 bg-slate-50/50 shadow-sm transition-hover hover:border-amber-200 duration-300">
         <div className="flex items-center gap-3 mb-6">
           <Settings className="w-8 h-8 text-amber-600" />
@@ -177,7 +186,6 @@ export default function Home() {
         </button>
       </section>
 
-      {/* Search & Filter UI */}
       <section className="mb-12 flex flex-col md:flex-row gap-4 justify-between items-center">
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -201,7 +209,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Product Grid */}
       <section>
         {isLoading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-amber-500 w-10 h-10" /></div>
@@ -216,7 +223,6 @@ export default function Home() {
         )}
       </section>
 
-      {/* Restored Intercontinental Footer */}
       <footer className="mt-24 bg-slate-900 text-white p-12 rounded-[2.5rem] text-center shadow-2xl relative overflow-hidden">
         <div className="relative z-10">
           <Globe className="w-10 h-10 text-amber-500 animate-pulse mx-auto mb-4" />
@@ -226,7 +232,6 @@ export default function Home() {
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl"></div>
       </footer>
 
-      {/* --- CUSTOM ORDER MODAL --- */}
       {isCustomModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsCustomModalOpen(false)} />
@@ -264,7 +269,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- CART DRAWER --- */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
