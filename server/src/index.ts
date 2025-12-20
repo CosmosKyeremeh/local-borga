@@ -72,6 +72,49 @@ app.get('/api/products', (req, res) => {
   res.json(products);
 });
 
+// server/src/index.ts (Add this route)
+
+// In-memory storage for demonstration (Replace with DB calls like prisma.order.create)
+let orders: any[] = []; 
+
+app.post('/api/orders', (req, res) => {
+  const newOrder = {
+    id: Date.now(),
+    ...req.body,
+    status: 'pending',
+    createdAt: new Date()
+  };
+
+  orders.push(newOrder);
+  console.log('✅ New Custom Order Received:', newOrder);
+
+  // Respond with success
+  res.status(201).json({ 
+    message: 'Order created successfully', 
+    order: newOrder 
+  });
+});
+
+// Route to fetch all orders for the Admin Dashboard
+app.get('/api/orders', (req, res) => {
+  res.json(orders);
+});
+
+// Optional: Route to update order status (e.g., Mark as "In Production")
+app.patch('/api/orders/:id', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  const orderIndex = orders.findIndex(o => o.id === parseInt(id));
+  if (orderIndex > -1) {
+    orders[orderIndex].status = status;
+    res.json({ message: 'Status updated', order: orders[orderIndex] });
+  } else {
+    res.status(404).json({ message: 'Order not found' });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`🚀 API is LIVE at http://localhost:${PORT}/api/products`);
 });
