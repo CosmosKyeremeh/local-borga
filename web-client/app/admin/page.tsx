@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { 
   Package, 
   Clock, 
@@ -9,9 +9,13 @@ import {
   RefreshCcw,
   ShieldCheck,
   TrendingUp,
-  Droplets
+  Droplets,
+  DollarSign
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+// Added Recharts for Task #16
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface Order {
   id: number;
@@ -27,15 +31,36 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- Task #16: Analytics Logic ---
+  const chartData = useMemo(() => {
+    const groups = orders.reduce((acc: any, order) => {
+      const date = new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      acc[date] = (acc[date] || 0) + order.totalPrice;
+      return acc;
+    }, {});
+
+    return Object.keys(groups).map(date => ({
+      date,
+      revenue: groups[date]
+    })).reverse();
+  }, [orders]);
+
+  const totalRevenue = useMemo(() => 
+    orders.reduce((sum, order) => sum + order.totalPrice, 0), 
+  [orders]);
+
+  // --- Task #11: Using Environment Variables ---
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders');
+      const res = await fetch(`${API_URL}/api/orders`);
       if (!res.ok) throw new Error('Backend Offline');
       const data = await res.json();
       setOrders(data.reverse()); 
     } catch (err) {
-      console.error("Fetch error:", err);
+      toast.error("Production Feed Offline");
     } finally {
       setLoading(false);
     }
@@ -47,14 +72,17 @@ export default function AdminDashboard() {
 
   const updateStatus = async (id: number, newStatus: string) => {
     try {
-      await fetch(`http://localhost:5000/api/orders/${id}`, {
+      const res = await fetch(`${API_URL}/api/orders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
-      fetchOrders(); 
+      if (res.ok) {
+        toast.success(`Order #${id.toString().slice(-4)} updated to ${newStatus}`);
+        fetchOrders(); 
+      }
     } catch (err) {
-      alert("Status update failed.");
+      toast.error("Broadcast Failed");
     }
   };
 
@@ -62,7 +90,7 @@ export default function AdminDashboard() {
     <main className="min-h-screen bg-[#0a0a0a] text-white p-8 md:p-16">
       <div className="max-w-6xl mx-auto">
         
-        {/* Bongr& Branding Header */}
+        {/* Header Section */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 border-b border-amber-500/20 pb-8">
           <div>
             <Link href="/" className="text-amber-500/50 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] mb-4 hover:text-amber-500 transition-all">
@@ -73,7 +101,7 @@ export default function AdminDashboard() {
               COMMAND CENTER
             </h1>
             <p className="text-slate-500 text-sm mt-2 font-medium flex items-center gap-2">
-              <Droplets size={14} className="text-amber-500" /> Nurturing Growth Through Production
+              <ShieldCheck size={14} className="text-amber-500" /> Executive Analytics & Production Control
             </p>
           </div>
           
@@ -86,8 +114,50 @@ export default function AdminDashboard() {
           </button>
         </header>
 
+        {/* --- New Analytics Overview Section --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+          {/* Revenue Summary */}
+          <div className="bg-[#121212] p-8 rounded-[2rem] border border-white/5 flex flex-col justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em] mb-2">Total Gross Revenue</p>
+              <h2 className="text-5xl font-black text-white">${totalRevenue.toFixed(2)}</h2>
+            </div>
+            <div className="mt-8 flex items-center gap-2 text-green-500 font-bold text-sm">
+              <TrendingUp size={16} /> +12.5% vs Last Week
+            </div>
+          </div>
+
+          {/* Revenue Chart */}
+          <div className="lg:col-span-2 bg-[#121212] p-8 rounded-[2rem] border border-white/5 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 700, fill: '#475569'}} 
+                />
+                <YAxis 
+                  hide 
+                />
+                <Tooltip 
+                  cursor={{fill: '#ffffff05'}}
+                  contentStyle={{backgroundColor: '#1a1a1a', borderRadius: '12px', border: 'none', color: '#fff'}}
+                />
+                <Bar dataKey="revenue" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={30} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
         {/* Orders Grid */}
         <div className="grid grid-cols-1 gap-4">
+          <div className="flex items-center gap-2 mb-4 px-4">
+            <div className="w-2 h-2 bg-amber-500 rounded-full animate-ping"></div>
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Live Production Feed</h3>
+          </div>
+          
           {orders.length === 0 ? (
             <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
               <Package size={48} className="mx-auto text-white/10 mb-4" />
@@ -97,10 +167,10 @@ export default function AdminDashboard() {
             orders.map((order) => (
               <div 
                 key={order.id} 
-                className="group relative bg-[#121212] border border-white/5 p-8 rounded-[2rem] flex flex-col md:flex-row justify-between items-center transition-all hover:border-amber-500/30 hover:bg-[#161616]"
+                className="group relative bg-[#121212] border border-white/5 p-8 rounded-[2rem] flex flex-col md:flex-row justify-between items-center transition-all hover:border-amber-500/30"
               >
                 <div className="flex gap-8 items-center w-full md:w-auto">
-                  <div className="text-xs font-mono text-amber-500/30 rotate-90 md:rotate-0">
+                  <div className="text-xs font-mono text-amber-500/30">
                     #{order.id.toString().slice(-4)}
                   </div>
                   <div>
@@ -120,14 +190,14 @@ export default function AdminDashboard() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => updateStatus(order.id, 'milling')}
-                      className={`p-4 rounded-2xl transition-all ${order.status === 'milling' ? 'bg-amber-500 text-black' : 'bg-white/5 text-white hover:bg-white/10'}`}
+                      className={`p-4 rounded-2xl transition-all ${order.status === 'milling' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-white/5 text-white hover:bg-white/10'}`}
                       title="Set to Milling"
                     >
-                      <RefreshCcw size={20} />
+                      <RefreshCcw size={20} className={order.status === 'milling' ? 'animate-spin-slow' : ''} />
                     </button>
                     <button 
                       onClick={() => updateStatus(order.id, 'completed')}
-                      className="p-4 bg-white/5 text-white rounded-2xl hover:bg-green-600 transition-all"
+                      className={`p-4 rounded-2xl transition-all ${order.status === 'completed' ? 'bg-green-600 text-white' : 'bg-white/5 text-white hover:bg-green-600/20'}`}
                       title="Complete Order"
                     >
                       <CheckCircle size={20} />
@@ -135,7 +205,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                {/* Status Indicator Bar */}
                 <div className={`absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full ${
                   order.status === 'pending' ? 'bg-amber-500/20' : 
                   order.status === 'milling' ? 'bg-amber-500 animate-pulse' : 'bg-green-500'
