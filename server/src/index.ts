@@ -2,17 +2,22 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import dotenv from 'dotenv'; // Added for environment variable support
+
+// 0. Initialize Environment Variables
+dotenv.config();
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000; // Use .env port or fallback to 5000
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000"; // Dynamic URL for storefront
 
 // 1. Create HTTP server for Socket.io to latch onto
 const server = http.createServer(app);
 
-// 2. Initialize the broadcaster
+// 2. Initialize the broadcaster with secure CORS settings
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Matches your web-client URL
+    origin: FRONTEND_URL, // Secured via Environment Variable
     methods: ["GET", "POST", "PATCH"]
   }
 });
@@ -96,4 +101,5 @@ app.patch('/api/orders/:id', (req, res) => {
 // NOTE: We now listen on 'server', not 'app'
 server.listen(PORT, () => {
   console.log(`🚀 API BROADCASTER: LIVE at http://localhost:${PORT}`);
+  console.log(`🔒 SECURE ORIGIN: ${FRONTEND_URL}`);
 });
