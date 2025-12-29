@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react'; 
+import { useReactToPrint } from 'react-to-print';
 import { 
   Package, Clock, CheckCircle, ChevronLeft, RefreshCcw,
-  ShieldCheck, TrendingUp, Droplets, DollarSign
+  ShieldCheck, TrendingUp, Droplets, DollarSign, Printer
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Added for Task #15 protection
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { PrintableLabel } from './components/PrintableLabel';
 
 interface Order {
   id: number;
@@ -23,16 +25,27 @@ interface Order {
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // Initialize router
+  const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null); // State for printing
+  const router = useRouter();
+  const printRef = useRef<HTMLDivElement>(null); // Ref for the label
 
-  // --- Task #11: Using Environment Variables ---
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  // --- Auth & Fetch Logic ---
+  // --- Print Configuration ---
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
+
+  const preparePrint = (order: Order) => {
+    setActivePrintOrder(order);
+    // Trigger print dialog after state update
+    setTimeout(() => handlePrint(), 150);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      router.push('/admin/login'); // Gatekeeper check
+      router.push('/admin/login');
     } else {
       fetchOrders();
     }
@@ -52,7 +65,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Analytics Logic ---
   const chartData = useMemo(() => {
     const groups = orders.reduce((acc: any, order) => {
       const date = new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -106,6 +118,7 @@ export default function AdminDashboard() {
           </button>
         </header>
 
+        {/* Analytics Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
           <div className="bg-[#121212] p-8 rounded-[2rem] border border-white/5 flex flex-col justify-between">
             <div>
@@ -129,6 +142,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Live Production Feed */}
         <div className="grid grid-cols-1 gap-4">
           <div className="flex items-center gap-2 mb-4 px-4">
             <div className="w-2 h-2 bg-amber-500 rounded-full animate-ping"></div>
@@ -155,6 +169,15 @@ export default function AdminDashboard() {
                     <p className="text-2xl font-black">${order.totalPrice.toFixed(2)}</p>
                   </div>
                   <div className="flex gap-2">
+                    {/* NEW: Print Button */}
+                    <button 
+                      onClick={() => preparePrint(order)}
+                      className="p-4 bg-white/5 text-white rounded-2xl hover:bg-white/20 transition-all"
+                      title="Print Label"
+                    >
+                      <Printer size={20} />
+                    </button>
+
                     <button onClick={() => updateStatus(order.id, 'milling')} className={`p-4 rounded-2xl transition-all ${order.status === 'milling' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-white/5 text-white hover:bg-white/10'}`}>
                       <RefreshCcw size={20} className={order.status === 'milling' ? 'animate-spin-slow' : ''} />
                     </button>
@@ -168,6 +191,11 @@ export default function AdminDashboard() {
             ))
           )}
         </div>
+      </div>
+
+      {/* HIDDEN PRINTABLE COMPONENT */}
+      <div className="hidden">
+        {activePrintOrder && <PrintableLabel ref={printRef} order={activePrintOrder} />}
       </div>
     </main>
   );
