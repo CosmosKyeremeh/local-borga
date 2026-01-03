@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link'; 
 import { 
   ShoppingCart, Settings, Globe, AlertCircle, Loader2, 
-  X, Plus, Minus, Trash2, Search, Filter, CheckCircle2, MapPin
+  X, Plus, Minus, Trash2, Search, Filter, CheckCircle2, MapPin, Menu
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
+import { motion, AnimatePresence } from 'framer-motion';
 
+// --- Types ---
 interface Product {
   id: number;
   name: string;
@@ -25,14 +27,12 @@ interface CartItem extends Product {
 }
 
 export default function Home() {
-  // --- RESTORED: Main States ---
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- RESTORED: UI & Modal States ---
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
@@ -42,14 +42,12 @@ export default function Home() {
     milling: 'Medium Grain'
   });
 
-  // --- RESTORED: Tracking States (#17) ---
   const [trackingId, setTrackingId] = useState('');
   const [trackedOrder, setTrackedOrder] = useState<any>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  // --- Real-time Socket Connection ---
   useEffect(() => {
     const socket = io(API_URL);
     socket.on('orderStatusUpdated', (data) => {
@@ -58,7 +56,6 @@ export default function Home() {
     return () => { socket.disconnect(); };
   }, [API_URL]);
 
-  // --- Fetch Catalog ---
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -76,7 +73,6 @@ export default function Home() {
     fetchProducts();
   }, [API_URL]);
 
-  // --- Logic Functions ---
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -151,162 +147,218 @@ export default function Home() {
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
-    <main className="min-h-screen bg-white p-8 md:p-16 max-w-7xl mx-auto relative">
-      
-      {/* RESTORED: Fixed Cart Button */}
-      <button 
-        onClick={() => setIsCartOpen(true)}
-        className="fixed top-8 right-8 z-40 bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:bg-amber-500 hover:text-slate-900 transition-all flex items-center gap-2 group"
+    <main className="min-h-screen bg-white">
+      {/* 1. SECTIONED NAVBAR */}
+      <motion.nav 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100 px-8 py-4"
       >
-        <ShoppingCart className="w-6 h-6" />
-        {cart.length > 0 && (
-          <span className="bg-amber-500 text-slate-900 text-xs font-black h-5 w-5 flex items-center justify-center rounded-full animate-bounce">
-            {cart.length}
-          </span>
-        )}
-      </button>
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <Link href="/" className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Logo" className="h-10 w-auto" />
+            <span className="font-black uppercase tracking-tighter text-xl text-slate-900">Local Borga</span>
+          </Link>
 
-      {/* Header */}
-      <header className="mb-12 flex flex-col items-start gap-4">
-        <div className="flex items-center gap-4">
-          <img src="/logo.jpg" alt="Logo" className="h-20 w-auto object-contain" />
-          <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Local Borga</h1>
-            <div className="h-1 w-full bg-amber-500 rounded-full mt-1"></div>
+          <div className="hidden md:flex items-center gap-8">
+            {['Catalog', 'Tracking', 'Heritage'].map((item) => (
+              <a key={item} href={`#${item.toLowerCase()}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">
+                {item}
+              </a>
+            ))}
+            <Link href="/admin" className="text-[10px] font-black uppercase tracking-[0.2em] bg-slate-100 px-4 py-2 rounded-full hover:bg-amber-500 hover:text-white transition-all">Admin</Link>
           </div>
-        </div>
-        <Link href="/admin" className="text-[10px] font-black text-slate-400 hover:text-amber-600 uppercase tracking-[0.3em]">Command Center</Link>
-      </header>
 
-      {/* Tracking Section */}
-      <section className="mb-12 bg-slate-900 rounded-[2.5rem] p-10 text-white">
-        <h2 className="text-2xl font-black uppercase tracking-tight mb-2 flex items-center gap-3">
-          <MapPin className="text-amber-500" /> Track Production
-        </h2>
-        <form onSubmit={handleTrackOrder} className="flex gap-2 max-w-lg mt-4">
-          <input 
-            type="text" 
-            placeholder="Enter ID..."
-            className="flex-grow bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 font-mono text-sm"
-            value={trackingId}
-            onChange={(e) => setTrackingId(e.target.value)}
-          />
-          <button className="bg-amber-500 text-black font-black px-8 rounded-2xl hover:bg-amber-400 transition-all uppercase text-xs">Track</button>
-        </form>
-        {trackedOrder && (
-          <div className="mt-6 p-6 bg-white/5 border border-white/10 rounded-3xl flex justify-between items-center">
-             <div><p className="text-[10px] uppercase text-amber-500">Status</p><p className="text-xl font-black uppercase">{trackedOrder.status}</p></div>
-             <p className="font-bold">{trackedOrder.itemName}</p>
+          <button onClick={() => setIsCartOpen(true)} className="relative p-2 hover:bg-slate-50 rounded-full transition-colors">
+            <ShoppingCart size={24} className="text-slate-900" />
+            {cart.length > 0 && (
+              <motion.span 
+                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                className="absolute top-0 right-0 bg-amber-500 text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full"
+              >
+                {cart.length}
+              </motion.span>
+            )}
+          </button>
+        </div>
+      </motion.nav>
+
+      <div className="max-w-7xl mx-auto px-8 md:px-16 pt-32 pb-16">
+        {/* 2. HERO HEADER */}
+        <header className="mb-20 flex flex-col items-start gap-4">
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+            <h1 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+              Nurturing <br/><span className="text-amber-500">Excellence.</span>
+            </h1>
+            <div className="h-2 w-32 bg-slate-900 mt-4"></div>
+          </motion.div>
+        </header>
+
+        {/* 3. TRACKING SECTION */}
+        <section id="tracking" className="mb-20">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="bg-slate-900 rounded-[2.5rem] p-12 text-white relative overflow-hidden"
+          >
+            <div className="relative z-10 max-w-xl">
+              <h2 className="text-2xl font-black uppercase tracking-tight mb-4 flex items-center gap-3">
+                <MapPin className="text-amber-500" /> Live Order Concierge
+              </h2>
+              <form onSubmit={handleTrackOrder} className="flex gap-2">
+                <input 
+                  type="text" placeholder="Tracking ID..."
+                  className="flex-grow bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 font-mono"
+                  value={trackingId} onChange={(e) => setTrackingId(e.target.value)}
+                />
+                <button className="bg-amber-500 text-black font-black px-8 rounded-2xl hover:bg-white transition-all uppercase text-xs">Search</button>
+              </form>
+              <AnimatePresence>
+                {trackedOrder && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-8 pt-8 border-t border-white/10 flex justify-between items-center">
+                    <div><p className="text-[10px] uppercase text-amber-500 font-bold">Current Phase</p><p className="text-2xl font-black uppercase tracking-tighter">{trackedOrder.status}</p></div>
+                    <div className="text-right"><p className="text-[10px] uppercase text-slate-500 font-bold">Batch Item</p><p className="font-bold">{trackedOrder.itemName}</p></div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* 4. CUSTOM MILLING SECTION */}
+        <section className="mb-24">
+          <div className="flex flex-col md:flex-row items-center gap-12 border-2 border-slate-100 rounded-[3rem] p-12 bg-slate-50/30">
+            <div className="flex-grow">
+              <div className="flex items-center gap-3 mb-4 text-amber-600"><Settings size={32}/><h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">Tailored Production</h2></div>
+              <p className="text-slate-500 max-w-md font-medium">Have your staples milled to your exact texture and weight. Direct from the source to your doorstep.</p>
+            </div>
+            <button onClick={() => setIsCustomModalOpen(true)} className="bg-amber-500 hover:bg-slate-900 hover:text-white text-black font-black py-6 px-12 rounded-2xl uppercase tracking-widest transition-all">Start Custom Milling</button>
           </div>
-        )}
-      </section>
+        </section>
 
-      {/* RESTORED: Custom Milling Button */}
-      <section className="mb-12 border-2 border-slate-100 rounded-2xl p-8 bg-slate-50/50 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-8 h-8 text-amber-600" />
-          <h2 className="text-2xl font-bold text-slate-900">Custom Milling & Production</h2>
-        </div>
-        <button 
-          onClick={() => setIsCustomModalOpen(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-4 px-8 rounded-xl uppercase tracking-wide flex items-center gap-2"
-        >
-          Build Your Custom Order <Plus size={18}/>
-        </button>
-      </section>
+        {/* 5. PRODUCT CATALOG */}
+        <section id="catalog" className="mb-24">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
+             <div><h2 className="text-4xl font-black uppercase tracking-tight text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-8">The Collection</h2></div>
+             <div className="flex gap-2 overflow-x-auto pb-2">
+                {categories.map(cat => (
+                  <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>{cat}</button>
+                ))}
+             </div>
+          </div>
 
-      {/* Product Feed */}
-      <section className="mb-12 flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input type="text" placeholder="Search..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl" onChange={(e) => setSearchQuery(e.target.value)} />
-        </div>
-        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2">
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2 rounded-full text-sm font-bold ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{cat}</button>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        {isLoading ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-amber-500 w-10 h-10" /></div>
-        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} onAddToCart={() => addToCart(product)} />
+            {filteredProducts.map((product, idx) => (
+              <motion.div key={product.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
+                <ProductCard product={product} onAddToCart={() => addToCart(product)} />
+              </motion.div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
 
-      {/* RESTORED: Global Footer */}
-      <footer className="mt-24 bg-slate-900 text-white p-12 rounded-[2.5rem] text-center shadow-2xl">
-        <Globe className="w-10 h-10 text-amber-500 mx-auto mb-4 animate-pulse" />
-        <p className="text-2xl font-bold tracking-tight mb-2">🌍 Intercontinental Shipping Available</p>
-        <p className="text-slate-400 font-medium">From Ghana to the Rest of the World</p>
-      </footer>
+        {/* 6. HERITAGE / ABOUT SECTION (Using CEO Images) */}
+        <section id="heritage" className="py-24 bg-slate-900 text-white rounded-[4rem] overflow-hidden my-24 relative">
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 blur-3xl rounded-full"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center px-16 relative z-10">
+            <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+              <h2 className="text-5xl font-black leading-none uppercase mb-8">Executive <br/><span className="text-amber-500 italic font-serif">Oversight.</span></h2>
+              <p className="text-lg text-slate-400 font-medium mb-8">
+                At Local Borga, we believe in radical transparency. Every batch of Gari, Flour, and Spice 
+                is processed under executive scrutiny to ensure the heritage of Ghanaian milling 
+                meets the prestige of the global market.
+              </p>
+              <div className="flex items-center gap-4 py-6 border-y border-white/10">
+                 <div className="bg-amber-500 text-black p-3 rounded-xl"><ShieldCheck size={24}/></div>
+                 <div><p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Quality Assured</p><p className="font-bold">Managed by Local Borga HQ</p></div>
+              </div>
+            </motion.div>
 
-      {/* RESTORED: Modal Logic */}
-      {isCustomModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsCustomModalOpen(false)} />
-          <form onSubmit={handleCustomSubmit} className="relative w-full max-w-lg bg-white rounded-3xl overflow-hidden animate-in zoom-in duration-200">
-            <div className="bg-amber-500 p-6 text-slate-900 flex justify-between items-center">
-              <h2 className="text-xl font-bold uppercase tracking-tight">New Custom Request</h2>
-              <button type="button" onClick={() => setIsCustomModalOpen(false)}><X/></button>
-            </div>
-            <div className="p-8 space-y-6">
-              <div><label className="text-xs font-black text-slate-400 uppercase">Product</label><select className="w-full p-4 bg-slate-50 border rounded-xl outline-none mt-2" onChange={(e) => setCustomForm({...customForm, item: e.target.value})}><option>Gari</option><option>Cassava Flour</option></select></div>
-              <div><label className="text-xs font-black text-slate-400 uppercase">Quantity: {customForm.weight}kg</label><input type="range" min="5" max="50" step="5" className="w-full accent-amber-500 mt-2" onChange={(e) => setCustomForm({...customForm, weight: parseInt(e.target.value)})} /></div>
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-amber-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2">Send to Production <CheckCircle2 size={18}/></button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* RESTORED: Cart Sidebar */}
-      {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-8 animate-in slide-in-from-right duration-300">
-            <div className="flex justify-between items-center mb-8 border-b pb-4"><h2 className="text-2xl font-bold">Your Order</h2><button onClick={() => setIsCartOpen(false)}><X /></button></div>
-            <div className="flex-grow overflow-y-auto space-y-4">
-              {cart.length === 0 ? <p className="text-center text-slate-400 mt-20">Basket is empty</p> : cart.map(item => (
-                <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div><h4 className="font-bold text-slate-900 text-sm">{item.name}</h4><p className="text-xs text-slate-500">{item.description}</p></div>
-                  <div className="text-right"><p className="font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</p></div>
-                </div>
-              ))}
-            </div>
-            <div className="pt-6 border-t mt-6">
-              <div className="flex justify-between text-2xl font-black mb-6"><span>Total:</span><span>${cartTotal.toFixed(2)}</span></div>
-              <button className="w-full py-4 bg-amber-500 rounded-2xl font-black text-slate-900 shadow-lg hover:bg-amber-600 transition-all">Checkout</button>
-            </div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
+              className="relative h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5"
+            >
+              <img src="/images/ceo-boardroom.jpg" alt="Local Borga CEO" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-60" />
+            </motion.div>
           </div>
-        </div>
-      )}
+        </section>
+
+        {/* Footer */}
+        <footer className="mt-24 border-t border-slate-100 pt-16 text-center">
+          <Globe className="w-12 h-12 text-amber-500 mx-auto mb-6 animate-pulse" />
+          <h3 className="text-3xl font-black uppercase tracking-tighter mb-2">Intercontinental Staples</h3>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Direct from Accra, Ghana • Shipping Globally</p>
+          <div className="mt-12 text-[10px] font-black text-slate-300 uppercase tracking-[0.5em] pb-8">© 2025 Local Borga Executive</div>
+        </footer>
+      </div>
+
+      {/* Cart & Modals (Restored) */}
+      <AnimatePresence>
+        {isCartOpen && (
+          <div className="fixed inset-0 z-[100] flex justify-end">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25 }} className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-8">
+              <div className="flex justify-between items-center mb-8 border-b pb-4"><h2 className="text-2xl font-black uppercase">Your Order</h2><button onClick={() => setIsCartOpen(false)}><X /></button></div>
+              <div className="flex-grow overflow-y-auto space-y-4">
+                {cart.length === 0 ? <p className="text-center text-slate-400 mt-20 font-bold uppercase tracking-widest">Basket is Empty</p> : cart.map(item => (
+                  <div key={item.id} className="flex justify-between items-center p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <div><h4 className="font-black text-slate-900 uppercase text-sm">{item.name}</h4><p className="text-xs text-slate-500">{item.description}</p></div>
+                    <div className="text-right"><p className="font-black">${(item.price * item.quantity).toFixed(2)}</p></div>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-6 border-t mt-6">
+                <div className="flex justify-between text-2xl font-black mb-6 uppercase tracking-tighter"><span>Total</span><span>${cartTotal.toFixed(2)}</span></div>
+                <button className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest">Secure Checkout</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Modal */}
+      <AnimatePresence>
+        {isCustomModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsCustomModalOpen(false)} />
+            <motion.form 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              onSubmit={handleCustomSubmit} className="relative w-full max-w-lg bg-white rounded-[3rem] overflow-hidden"
+            >
+              <div className="bg-amber-500 p-8 text-black flex justify-between items-center">
+                <h2 className="text-xl font-black uppercase tracking-tight">Production Request</h2>
+                <button type="button" onClick={() => setIsCustomModalOpen(false)}><X/></button>
+              </div>
+              <div className="p-10 space-y-8">
+                <div><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Staple Type</label><select className="w-full p-4 bg-slate-50 border-none rounded-2xl mt-2 font-bold" onChange={(e) => setCustomForm({...customForm, item: e.target.value})}><option>Gari</option><option>Cassava Flour</option></select></div>
+                <div><label className="text-xs font-black text-slate-400 uppercase tracking-widest">Volume: {customForm.weight}kg</label><input type="range" min="5" max="50" step="5" className="w-full accent-amber-500 mt-2" onChange={(e) => setCustomForm({...customForm, weight: parseInt(e.target.value)})} /></div>
+                <button type="submit" className="w-full py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-amber-500 hover:text-black transition-all uppercase tracking-widest">Initialize Batch</button>
+              </div>
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
 
+// Sub-component
 function ProductCard({ product, onAddToCart }: { product: any, onAddToCart: () => void }) {
   return (
-    <div className="group border border-slate-100 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 bg-white flex flex-col relative">
+    <div className="group border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white flex flex-col relative">
       {product.isPremium && (
-        <div className="absolute top-4 right-4 z-10 animate-in fade-in zoom-in duration-500">
-          <span className="bg-amber-500 text-black text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg flex items-center gap-1">Limited Edition</span>
+        <div className="absolute top-4 right-4 z-10">
+          <span className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">Limited Edition</span>
         </div>
       )}
-      <div className="h-52 bg-slate-50 relative overflow-hidden">
-        <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      <div className="h-64 bg-slate-50 relative overflow-hidden">
+        <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
       </div>
-      <div className="p-5 flex flex-col flex-grow">
-        <h3 className="font-bold text-slate-900">{product.name}</h3>
-        <p className="text-slate-500 text-xs mt-2 mb-4 line-clamp-2">{product.description}</p>
-        <div className="mt-auto pt-4 border-t flex items-center justify-between">
-          <span className="text-xl font-black text-slate-900">${product.price.toFixed(2)}</span>
-          <button onClick={onAddToCart} className="p-2 bg-slate-100 rounded-lg hover:bg-amber-500 transition-colors"><Plus size={18}/></button>
+      <div className="p-8 flex flex-col flex-grow">
+        <h3 className="font-black text-slate-900 uppercase text-lg leading-tight">{product.name}</h3>
+        <p className="text-slate-500 text-xs mt-3 mb-6 font-medium line-clamp-2">{product.description}</p>
+        <div className="mt-auto pt-6 border-t flex items-center justify-between">
+          <span className="text-2xl font-black text-slate-900">${product.price.toFixed(2)}</span>
+          <button onClick={onAddToCart} className="p-3 bg-slate-900 text-white rounded-xl hover:bg-amber-500 hover:text-black transition-all"><Plus size={20}/></button>
         </div>
       </div>
     </div>
