@@ -80,6 +80,8 @@ export default function Home() {
     return matchesSearch && matchesCategory;
   });
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleTrackOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackingId) return;
@@ -149,39 +151,162 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white">
       {/* 1. SECTIONED NAVBAR */}
-      <motion.nav 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100 px-8 py-4"
-      >
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="Logo" className="h-10 w-auto" />
-            <span className="font-black uppercase tracking-tighter text-xl text-slate-900">Local Borga</span>
-          </Link>
+      
+<motion.nav 
 
-          <div className="hidden md:flex items-center gap-8">
+  initial={{ y: -100 }}
+
+  animate={{ y: 0 }}
+
+  className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4"
+
+>
+
+  <div className="max-w-7xl mx-auto flex justify-between items-center">
+
+    {/* Logo Area */}
+
+    <Link href="/" className="flex items-center gap-2">
+
+      <img src="/logo.jpg" alt="Logo" className="h-8 md:h-10 w-auto" />
+
+      <span className="font-black uppercase tracking-tighter text-lg md:text-xl text-slate-900">Local Borga</span>
+
+    </Link>
+
+
+
+    {/* Desktop Menu (Hidden on Mobile) */}
+
+    <div className="hidden md:flex items-center gap-8">
+
+      {['Catalog', 'Tracking', 'Heritage'].map((item) => (
+
+        <a key={item} href={`#${item.toLowerCase()}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">
+
+          {item}
+
+        </a>
+
+      ))}
+
+      <Link href="/admin" className="text-[10px] font-black uppercase tracking-[0.2em] bg-slate-100 px-4 py-2 rounded-full hover:bg-amber-500 hover:text-white transition-all">Admin</Link>
+
+    </div>
+
+
+
+    {/* Right Actions (Cart + Mobile Toggle) */}
+
+    <div className="flex items-center gap-4">
+
+      <button onClick={() => setIsCartOpen(true)} className="relative p-2 hover:bg-slate-50 rounded-full transition-colors">
+
+        <ShoppingCart size={22} className="text-slate-900" />
+
+        {cart.length > 0 && (
+
+          <motion.span 
+
+            initial={{ scale: 0 }} animate={{ scale: 1 }}
+
+            className="absolute top-0 right-0 bg-amber-500 text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full"
+
+          >
+
+            {cart.length}
+
+          </motion.span>
+
+        )}
+
+      </button>
+
+
+
+      {/* MOBILE MENU TOGGLE (Visible only on small screens) */}
+
+      <button 
+
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+
+        className="md:hidden p-2 text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+
+      >
+
+        {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+
+      </button>
+
+    </div>
+
+  </div>
+
+
+
+  {/* MOBILE MENU DRAWER */}
+
+    <AnimatePresence>
+
+      {isMobileMenuOpen && (
+
+        <motion.div 
+
+          initial={{ opacity: 0, height: 0 }}
+
+          animate={{ opacity: 1, height: 'auto' }}
+
+          exit={{ opacity: 0, height: 0 }}
+
+          className="md:hidden bg-white border-t border-slate-100 overflow-hidden"
+
+        >
+
+          <div className="flex flex-col p-6 gap-6">
+
             {['Catalog', 'Tracking', 'Heritage'].map((item) => (
-              <a key={item} href={`#${item.toLowerCase()}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">
+
+              <a 
+
+                key={item} 
+
+                href={`#${item.toLowerCase()}`} 
+
+                onClick={() => setIsMobileMenuOpen(false)} // Close on click
+
+                className="text-xs font-black uppercase tracking-[0.3em] text-slate-900"
+
+              >
+
                 {item}
+
               </a>
+
             ))}
-            <Link href="/admin" className="text-[10px] font-black uppercase tracking-[0.2em] bg-slate-100 px-4 py-2 rounded-full hover:bg-amber-500 hover:text-white transition-all">Admin</Link>
+
+            <Link 
+
+              href="/admin" 
+
+              onClick={() => setIsMobileMenuOpen(false)}
+
+              className="text-xs font-black uppercase tracking-[0.3em] text-amber-600"
+
+            >
+
+              Admin Command Center
+
+            </Link>
+
           </div>
 
-          <button onClick={() => setIsCartOpen(true)} className="relative p-2 hover:bg-slate-50 rounded-full transition-colors">
-            <ShoppingCart size={24} className="text-slate-900" />
-            {cart.length > 0 && (
-              <motion.span 
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                className="absolute top-0 right-0 bg-amber-500 text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full"
-              >
-                {cart.length}
-              </motion.span>
-            )}
-          </button>
-        </div>
-      </motion.nav>
+        </motion.div>
+
+      )}
+
+    </AnimatePresence>
+
+  </motion.nav>
 
       <div className="max-w-7xl mx-auto px-8 md:px-16 pt-32 pb-16">
         {/* 2. HERO HEADER */}
