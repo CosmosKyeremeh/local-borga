@@ -387,9 +387,7 @@ export default function Home() {
             <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
               <h2 className="text-5xl font-black leading-none uppercase mb-8">Executive <br/><span className="text-amber-500 italic font-serif">Oversight.</span></h2>
               <p className="text-lg text-slate-400 font-medium mb-8">
-                At Local Borga, we believe in radical transparency. Every batch of Gari, Flour, and Spice 
-                is processed under executive scrutiny to ensure the heritage of Ghanaian milling 
-                meets the prestige of the global market.
+                Perfection is an asymptote—we are forever chasing it, forever closing the gap. Our philosophy is rooted in an obsessive attention to detail that borders on the unreasonable. We believe that if a thing is worth building, it is worth building to outlast its creator. This is not just a product; it is the physical manifestation of our uncompromising standard.
               </p>
               <div className="flex items-center gap-4 py-6 border-y border-white/10">
                  <div className="bg-amber-500 text-black p-3 rounded-xl"><ShieldCheck size={24}/></div>
