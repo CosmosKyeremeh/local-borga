@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link'; 
 import { 
   ShoppingCart, Settings, Globe, AlertCircle, Loader2, 
-  X, Plus, Minus, Trash2, Search, Filter, CheckCircle2, MapPin, Menu
+  X, Plus, Minus, Trash2, Search, Filter, CheckCircle2, MapPin, Menu,ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
@@ -255,7 +255,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 6. HERITAGE / ABOUT SECTION (Using CEO Images) */}
+        {/*  HERITAGE / ABOUT SECTION (Using CEO Images) */}
         <section id="heritage" className="py-24 bg-slate-900 text-white rounded-[4rem] overflow-hidden my-24 relative">
           <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 blur-3xl rounded-full"></div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center px-16 relative z-10">
@@ -276,7 +276,7 @@ export default function Home() {
               initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
               className="relative h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5"
             >
-              <img src="/images/ceo-boardroom.jpg" alt="Local Borga CEO" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+              <img src="/images/local-borga-headquarters-interior1.jpg" alt="Local Borga CEO" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-60" />
             </motion.div>
           </div>
@@ -291,7 +291,7 @@ export default function Home() {
         </footer>
       </div>
 
-      {/* Cart & Modals (Restored) */}
+      {/* Cart & Modals */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
