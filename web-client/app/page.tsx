@@ -46,7 +46,7 @@ export default function Home() {
   const [trackedOrder, setTrackedOrder] = useState<any>(null);
   const [isTrackLoading, setIsTrackLoading] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || ' ';
 
   useEffect(() => {
     const socket = io(API_URL);
