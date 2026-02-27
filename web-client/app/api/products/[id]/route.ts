@@ -1,3 +1,4 @@
+// web-client/app/api/products/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/src/lib/supabase/server';
 
@@ -9,24 +10,15 @@ export async function GET(
     const { id } = await params;
     const supabase = createServerClient();
     const { data, error } = await supabase
-      .from('orders')
+      .from('products')
       .select('*')
       .eq('id', id)
       .single();
 
     if (error || !data) {
-      return NextResponse.json({ message: 'Order Not Found' }, { status: 404 });
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
-
-    return NextResponse.json({
-      id:           data.id,
-      itemName:     data.item_name,
-      millingStyle: data.milling_style,
-      weightKg:     data.weight_kg,
-      totalPrice:   data.total_price,
-      status:       data.status,
-      createdAt:    data.created_at,
-    });
+    return NextResponse.json(data);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -38,26 +30,37 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { status } = await request.json();
-
-    if (!status) {
-      return NextResponse.json({ error: 'status is required' }, { status: 400 });
-    }
-
+    const body = await request.json();
     const supabase = createServerClient();
+
     const { data, error } = await supabase
-      .from('orders')
-      .update({ status })
+      .from('products')
+      .update(body)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
 
-    return NextResponse.json({
-      message: 'Status updated',
-      order: { id: data.id, itemName: data.item_name, status: data.status },
-    });
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = createServerClient();
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
