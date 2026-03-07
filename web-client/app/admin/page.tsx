@@ -1,23 +1,31 @@
 'use client';
 
-// web-client/app/page.tsx
+// web-client/app/admin/page.tsx
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import Image from 'next/image';
 import {
-  Settings, Globe, Loader2,
-  X, Plus, Minus, Trash2, Search, ShieldCheck, ShoppingCart, Menu
+  Package, CheckCircle, ChevronLeft, RefreshCcw, ShieldCheck,
+  TrendingUp, Printer, LogOut, Plus, Pencil, Trash2, X, ImageIcon
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { PrintableLabel } from './components/PrintableLabel';
 
-// ✅ Correct paths for this project structure
-import { supabaseBrowser } from '@/src/lib/supabase/browser';
-import { useCart } from '@/src/context/CartContext';
+// ── Types ──────────────────────────────────────────────────────────
+interface Order {
+  id: number;
+  itemName: string;
+  millingStyle: string;
+  weightKg: number;
+  totalPrice: number;
+  status: 'pending' | 'milling' | 'completed';
+  createdAt: string;
+}
 
-// -------------------------------------------------------------------
-// Types (aligned with Supabase column names)
-// -------------------------------------------------------------------
 interface Product {
   id: number;
   name: string;
@@ -25,763 +33,460 @@ interface Product {
   category: string;
   description: string;
   image: string;
-  is_premium?: boolean;   // Supabase uses snake_case
+  is_premium: boolean;
 }
 
-// -------------------------------------------------------------------
-// Page
-// -------------------------------------------------------------------
-export default function Home() {
-  const {
-    cart,
-    addToCart,
-    removeFromCart,
-    updateQuantity,
-    totalAmount,
-    cartCount,
-  } = useCart();
+// Fix 1: Typed Supabase row shape instead of `any`
+interface SupabaseOrderRow {
+  id: number;
+  item_name: string;
+  milling_style: string | null;
+  weight_kg: number | null;
+  total_price: number;
+  status: 'pending' | 'milling' | 'completed';
+  created_at: string;
+}
 
-  const [products, setProducts]                   = useState<Product[]>([]);
-  const [isLoading, setIsLoading]                 = useState(true);
-  const [error, setError]                         = useState<string | null>(null);
-  const [isCartOpen, setIsCartOpen]               = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen]   = useState(false);
-  const [searchQuery, setSearchQuery]             = useState('');
-  const [selectedCategory, setSelectedCategory]   = useState('All');
+const EMPTY_PRODUCT = { name: '', price: '', category: '', description: '', image: '', is_premium: false };
 
-  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
-  const [customForm, setCustomForm] = useState({
-    item:    'Gari',
-    weight:  5,
-    milling: 'Medium Grain',
-  });
+export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<'orders' | 'products'>('orders');
 
-  const [trackingId, setTrackingId]               = useState('');
-  const [trackedOrder, setTrackedOrder]           = useState<any>(null);
-  const [isTrackLoading, setIsTrackLoading]       = useState(false);
+  const [orders, setOrders]   = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
-  // ----------------------------------------------------------------
-  // Supabase Realtime — replaces Socket.IO
-  // Listens for any UPDATE on orders table → toasts the user.
-  // Works on Vercel because Supabase holds the persistent connection,
-  // not our serverless function.
-  // ----------------------------------------------------------------
+  const [products, setProducts]             = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct]     = useState<Product | null>(null);
+  const [productForm, setProductForm]           = useState<typeof EMPTY_PRODUCT>({ ...EMPTY_PRODUCT });
+  const [savingProduct, setSavingProduct]       = useState(false);
+
+  const router = useRouter();
+
+  const handlePrint = useReactToPrint({ contentRef: printRef });
+  const preparePrint = (order: Order) => {
+    setActivePrintOrder(order);
+    setTimeout(() => handlePrint(), 150);
+  };
+
   useEffect(() => {
-    const channel = supabaseBrowser
-      .channel('order-status-updates')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          const updated = payload.new as any;
-          toast.success(
-            `Production Update: ${updated.item_name} is now ${String(updated.status).toUpperCase()}!`,
-            { duration: 6000 }
-          );
-        }
-      )
-      .subscribe();
-
-    return () => { supabaseBrowser.removeChannel(channel); };
-  }, []);
-
-  // ----------------------------------------------------------------
-  // Fetch products from Next.js API route (Supabase-backed)
-  // Relative URL — works locally and on Vercel without any config
-  // ----------------------------------------------------------------
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setIsLoading(true);
-        const res = await fetch('/api/products');
-        if (!res.ok) throw new Error('Failed to fetch products');
-        const data = await res.json();
-        setProducts(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const token = localStorage.getItem('adminToken');
+    if (!token) { router.push('/admin/login'); return; }
+    fetchOrders();
     fetchProducts();
   }, []);
 
-  // ----------------------------------------------------------------
-  // Derived state
-  // ----------------------------------------------------------------
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
-  const filteredProducts = products.filter(p => {
-    const matchesSearch   = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    toast.success('Logged out');
+    router.push('/admin/login');
+  };
 
-  // ----------------------------------------------------------------
-  // Handlers
-  // ----------------------------------------------------------------
-  const handleAddToCart = (product: Product) => {
-    addToCart({
-      id:          product.id.toString(),
-      name:        product.name,
-      price:       product.price,
-      image:       product.image,
-      category:    product.category,
-      description: product.description,
-      type:        'SHELF',
-      quantity:    1,
+  // ── Orders ─────────────────────────────────────────────────────
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/orders');
+      if (!res.ok) throw new Error('Feed Offline');
+      const raw: SupabaseOrderRow[] = await res.json(); // Fix 1: typed, no `any`
+      setOrders(raw.map((o) => ({
+        id: o.id,
+        itemName: o.item_name,
+        millingStyle: o.milling_style ?? '—',
+        weightKg: o.weight_kg ?? 0,
+        totalPrice: o.total_price,
+        status: o.status,
+        createdAt: o.created_at,
+      })));
+    } catch { toast.error('Production Feed Offline'); }
+    finally { setLoading(false); }
+  };
+
+  const updateStatus = async (id: number, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) { toast.success(`#${id} → ${newStatus}`); fetchOrders(); }
+    } catch { toast.error('Update Failed'); }
+  };
+
+  // ── Products ───────────────────────────────────────────────────
+  const fetchProducts = async () => {
+    try {
+      setProductsLoading(true);
+      const res = await fetch('/api/products');
+      if (!res.ok) throw new Error();
+      setProducts(await res.json());
+    } catch { toast.error('Could not load products'); }
+    finally { setProductsLoading(false); }
+  };
+
+  const openNewProduct = () => {
+    setEditingProduct(null);
+    setProductForm({ ...EMPTY_PRODUCT });
+    setShowProductModal(true);
+  };
+
+  const openEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setProductForm({
+      name: p.name, price: String(p.price), category: p.category,
+      description: p.description, image: p.image, is_premium: p.is_premium,
     });
-    setIsCartOpen(true);
+    setShowProductModal(true);
   };
 
-  const handleTrackOrder = async (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackingId.trim()) return;
-    setIsTrackLoading(true);
-    try {
-      const res = await fetch(`/api/orders/${trackingId.trim()}`);
-      if (!res.ok) throw new Error('Not Found');
-      const data = await res.json();
-      setTrackedOrder(data);
-      toast.success('Order Located');
-    } catch {
-      toast.error('Invalid Tracking ID');
-      setTrackedOrder(null);
-    } finally {
-      setIsTrackLoading(false);
+    if (!productForm.name || !productForm.price || !productForm.category) {
+      toast.error('Name, price, and category are required');
+      return;
     }
-  };
-
-  const handleCustomSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const orderData = {
-      itemName:     customForm.item,
-      millingStyle: customForm.milling,
-      weightKg:     customForm.weight,
-      totalPrice:   parseFloat((15.00 * customForm.weight / 5).toFixed(2)),
+    setSavingProduct(true);
+    const payload = {
+      name: productForm.name,
+      price: parseFloat(productForm.price as string),
+      category: productForm.category.toUpperCase(),
+      description: productForm.description,
+      image: productForm.image || '/images/placeholder.jpg',
+      is_premium: productForm.is_premium,
     };
-
     try {
-      const res = await fetch('/api/orders', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(orderData),
+      const url    = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
+      const method = editingProduct ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Order failed');
-      const result = await res.json();
-
-      addToCart({
-        id:       result.order.id.toString(),
-        name:     `Custom ${orderData.itemName}`,
-        price:    orderData.totalPrice,
-        image:    '/images/custom-milling.jpg',
-        category: 'CUSTOM',
-        type:     'CUSTOM_MILLING',
-        quantity: 1,
-        config: {
-          millingStyle: orderData.millingStyle,
-          weightKg:     orderData.weightKg,
-        },
-      });
-
-      setIsCustomModalOpen(false);
-      setIsCartOpen(true);
-      toast.info('Production Started!', {
-        description: `Tracking ID: ${result.order.id}`,
-      });
-    } catch {
-      toast.error('Order Failed. Please try again.');
-    }
+      if (!res.ok) throw new Error();
+      toast.success(editingProduct ? 'Product updated' : 'Product added to catalog');
+      setShowProductModal(false);
+      fetchProducts();
+    } catch { toast.error('Failed to save product'); }
+    finally { setSavingProduct(false); }
   };
 
-  // ----------------------------------------------------------------
-  // Render
-  // ----------------------------------------------------------------
+  const handleDeleteProduct = async (id: number, name: string) => {
+    if (!confirm(`Delete "${name}" from the catalog?`)) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      toast.success(`${name} removed`);
+      fetchProducts();
+    } catch { toast.error('Delete failed'); }
+  };
+
+  // ── Analytics ─────────────────────────────────────────────────
+  const totalRevenue = useMemo(() => orders.reduce((sum, o) => sum + o.totalPrice, 0), [orders]);
+  const chartData = useMemo(() => {
+    // Fix 1: typed accumulator, no `any`
+    const groups = orders.reduce<Record<string, number>>((acc, o) => {
+      const date = new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      acc[date] = (acc[date] || 0) + o.totalPrice;
+      return acc;
+    }, {});
+    return Object.keys(groups).map(date => ({ date, revenue: groups[date] })).reverse();
+  }, [orders]);
+
   return (
-    <main className="bg-white min-h-screen">
+    <main className="min-h-screen bg-[#0a0a0a] text-white p-8 md:p-16">
+      <div className="max-w-6xl mx-auto">
 
-      {/* ── NAVBAR (inline — Navbar.tsx in admin/components is admin-only) ── */}
-      <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-4"
-      >
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="Local Borga" className="h-10 w-auto" />
-            <span className="font-black uppercase tracking-tighter text-xl text-slate-900">
-              Local Borga
-            </span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-8">
-            {['catalog', 'tracking', 'heritage'].map(section => (
-              <a
-                key={section}
-                href={`#${section}`}
-                className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors"
-              >
-                {section}
-              </a>
-            ))}
-            <Link
-              href="/admin"
-              className="text-[10px] font-black uppercase tracking-[0.2em] bg-slate-100 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
-            >
-              Admin
+        {/* HEADER */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 border-b border-amber-500/20 pb-8">
+          <div>
+            <Link href="/" className="text-amber-500/50 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] mb-4 hover:text-amber-500 transition-all">
+              <ChevronLeft size={14} /> Return to Store
             </Link>
+            <h1 className="text-4xl font-black tracking-tighter flex items-center gap-4">
+              <span className="bg-amber-500 text-black px-3 py-1 rounded-sm italic">B&</span> COMMAND CENTER
+            </h1>
+            <div className="flex items-center gap-2 mt-3 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 w-fit">
+              <ShieldCheck size={14} className="text-amber-500" />
+              <p className="text-amber-500 text-xs font-black uppercase tracking-widest">Admin Session Active</p>
+            </div>
           </div>
+          <div className="flex gap-3 mt-6 md:mt-0">
+            {/* Fix 3: aria-label on icon buttons */}
+            <button
+              onClick={fetchOrders}
+              aria-label="Refresh orders"
+              className="flex items-center gap-3 px-6 py-4 bg-white/5 text-white font-black uppercase text-xs tracking-widest rounded-full hover:bg-white/10 transition-all"
+            >
+              <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+            <button
+              onClick={handleLogout}
+              aria-label="Logout of admin"
+              className="flex items-center gap-3 px-6 py-4 bg-red-500/10 text-red-400 font-black uppercase text-xs tracking-widest rounded-full hover:bg-red-500/20 transition-all border border-red-500/20"
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </div>
+        </header>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-2 hover:bg-slate-50 rounded-full transition-colors"
-            >
-              <ShoppingCart size={24} className="text-slate-900" />
-              {cartCount > 0 && (
-                <span className="absolute top-0 right-0 bg-amber-500 text-black text-[10px] font-bold h-4 w-4 flex items-center justify-center rounded-full">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <button
-              className="md:hidden p-2"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <Menu size={24} />
-            </button>
+        {/* ANALYTICS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+          <div className="bg-[#121212] p-8 rounded-[2rem] border border-white/5 flex flex-col justify-between">
+            <div>
+              <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em] mb-2">Total Gross Revenue</p>
+              <h2 className="text-5xl font-black text-white">${totalRevenue.toFixed(2)}</h2>
+            </div>
+            <div className="mt-8 flex items-center gap-2 text-green-500 font-bold text-sm">
+              <TrendingUp size={16} /> Data Pulse: Live
+            </div>
+          </div>
+          <div className="lg:col-span-2 bg-[#121212] p-8 rounded-[2rem] border border-white/5 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#475569' }} />
+                <YAxis hide />
+                <Tooltip cursor={{ fill: '#ffffff05' }} contentStyle={{ backgroundColor: '#1a1a1a', borderRadius: '12px', border: 'none', color: '#fff' }} />
+                <Bar dataKey="revenue" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={30} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Mobile menu */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="md:hidden overflow-hidden border-t border-slate-100 mt-4"
-            >
-              <div className="py-4 flex flex-col gap-4">
-                {['catalog', 'tracking', 'heritage'].map(section => (
-                  <a
-                    key={section}
-                    href={`#${section}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400"
-                  >
-                    {section}
-                  </a>
-                ))}
+        {/* TABS */}
+        <div className="flex gap-2 mb-8">
+          {(['orders', 'products'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              aria-label={`Switch to ${tab} tab`}
+              className={`px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+            >{tab}</button>
+          ))}
+        </div>
+
+        {/* ORDERS TAB */}
+        {activeTab === 'orders' && (
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center gap-2 mb-4 px-4">
+              <div className="w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Live Production Feed</h3>
+            </div>
+            {orders.length === 0 ? (
+              <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                <Package size={48} className="mx-auto text-white/10 mb-4" />
+                <p className="text-slate-500 font-bold uppercase tracking-widest">No Active Orders</p>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.nav>
+            ) : orders.map(order => (
+              <div key={order.id} className="group relative bg-[#121212] border border-white/5 p-8 rounded-[2rem] flex flex-col md:flex-row justify-between items-center transition-all hover:border-amber-500/30">
+                <div className="flex gap-8 items-center w-full md:w-auto">
+                  <div className="text-xs font-mono text-amber-500/30">#{order.id.toString().slice(-4)}</div>
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight">{order.itemName}</h3>
+                    <p className="text-amber-500 text-xs font-black uppercase tracking-widest mt-1">{order.millingStyle} Milling • {order.weightKg}kg</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-12 mt-8 md:mt-0 w-full md:w-auto justify-between md:justify-end">
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 font-bold uppercase mb-1">Revenue</p>
+                    <p className="text-2xl font-black">${order.totalPrice.toFixed(2)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Fix 3: aria-labels on all icon-only buttons */}
+                    <button
+                      onClick={() => preparePrint(order)}
+                      aria-label={`Print shipping label for order #${order.id}`}
+                      className="p-4 bg-white/5 text-white rounded-2xl hover:bg-white/20 transition-all"
+                    >
+                      <Printer size={20} />
+                    </button>
+                    <button
+                      onClick={() => updateStatus(order.id, 'milling')}
+                      aria-label={`Mark order #${order.id} as milling`}
+                      className={`p-4 rounded-2xl transition-all ${order.status === 'milling' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-white/5 text-white hover:bg-white/10'}`}
+                    >
+                      <RefreshCcw size={20} className={order.status === 'milling' ? 'animate-spin' : ''} />
+                    </button>
+                    <button
+                      onClick={() => updateStatus(order.id, 'completed')}
+                      aria-label={`Mark order #${order.id} as completed`}
+                      className={`p-4 rounded-2xl transition-all ${order.status === 'completed' ? 'bg-green-600 text-white' : 'bg-white/5 text-white hover:bg-green-600/20'}`}
+                    >
+                      <CheckCircle size={20} />
+                    </button>
+                  </div>
+                </div>
+                <div className={`absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full ${order.status === 'pending' ? 'bg-amber-500/20' : order.status === 'milling' ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
+              </div>
+            ))}
+          </div>
+        )}
 
-      <div className="max-w-7xl mx-auto px-6 pt-32 pb-16">
-
-        {/* ── 1. HERO ── */}
-        <section className="mb-24">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500 mb-6">
-              Direct from Accra, Ghana
-            </p>
-            <h1 className="text-7xl md:text-9xl font-black leading-none uppercase tracking-tighter text-slate-900 mb-8">
-              Local<br />
-              <span className="text-amber-500 italic font-serif">Borga.</span>
-            </h1>
-            <p className="text-slate-400 text-lg max-w-xl font-medium">
-              Premium Ghanaian staples and precision custom milling.
-              Intercontinental shipping from the source.
-            </p>
-            <div className="flex flex-wrap gap-4 mt-10">
-              <a
-                href="#catalog"
-                className="bg-slate-900 text-white font-black py-4 px-10 rounded-2xl uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all"
-              >
-                🛒 Start Fresh Shopping
-              </a>
+        {/* PRODUCTS TAB */}
+        {activeTab === 'products' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2 px-4">
+                <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">
+                  Catalog — {products.length} items
+                </h3>
+              </div>
               <button
-                onClick={() => setIsCustomModalOpen(true)}
-                className="border-2 border-slate-900 text-slate-900 font-black py-4 px-10 rounded-2xl uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all"
+                onClick={openNewProduct}
+                aria-label="Add new product to catalog"
+                className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-black font-black uppercase text-xs tracking-widest rounded-full hover:bg-amber-400 transition-all"
               >
-                ⚙️ Build Custom Order
+                <Plus size={16} /> Add Product
               </button>
             </div>
-          </motion.div>
-        </section>
 
-        {/* ── 2. SEARCH ── */}
-        <section className="mb-16">
-          <div className="relative max-w-xl">
-            <Search
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Search staples, flours, preserves..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-14 pr-6 py-5 bg-slate-50 rounded-2xl border-none outline-none text-slate-900 font-medium placeholder:text-slate-300"
-            />
-          </div>
-        </section>
-
-        {/* ── 3. ORDER TRACKING ── */}
-        <section id="tracking" className="mb-24">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="bg-slate-900 rounded-[3rem] p-12 text-white"
-          >
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
-              <div className="flex-grow">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-2">
-                  Live Production
-                </p>
-                <h2 className="text-3xl font-black uppercase tracking-tight">
-                  Track Your Order
-                </h2>
-                <p className="text-slate-400 mt-2 font-medium">
-                  Enter your tracking ID to see real-time production status.
-                </p>
-              </div>
-              <form onSubmit={handleTrackOrder} className="flex gap-3 w-full md:w-auto">
-                <input
-                  type="text"
-                  placeholder="Tracking ID..."
-                  value={trackingId}
-                  onChange={e => setTrackingId(e.target.value)}
-                  className="flex-grow md:w-56 px-6 py-4 bg-white/10 rounded-2xl border border-white/10 text-white placeholder:text-slate-500 font-mono outline-none focus:border-amber-500 transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={isTrackLoading}
-                  className="px-8 py-4 bg-amber-500 text-black font-black rounded-2xl uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50"
-                >
-                  {isTrackLoading
-                    ? <Loader2 size={20} className="animate-spin" />
-                    : 'Track'
-                  }
+            {productsLoading ? (
+              <div className="py-20 text-center text-slate-500 font-bold">Loading catalog...</div>
+            ) : products.length === 0 ? (
+              <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                <Package size={48} className="mx-auto text-white/10 mb-4" />
+                <p className="text-slate-500 font-bold uppercase tracking-widest">No products yet</p>
+                <button onClick={openNewProduct} className="mt-6 px-8 py-3 bg-amber-500 text-black font-black rounded-full uppercase text-xs tracking-widest hover:bg-amber-400 transition-all">
+                  Add First Product
                 </button>
-              </form>
-            </div>
-
-            <AnimatePresence>
-              {trackedOrder && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-8 pt-8 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-6"
-                >
-                  {[
-                    { label: 'Order ID',  value: `#${trackedOrder.id}` },
-                    { label: 'Item',      value: trackedOrder.itemName },
-                    { label: 'Status',    value: trackedOrder.status?.toUpperCase() },
-                    { label: 'Weight',    value: trackedOrder.weightKg ? `${trackedOrder.weightKg}kg` : '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="text-[10px] font-black uppercase text-slate-500 mb-1">{label}</p>
-                      <p className="font-black text-lg">{value}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {products.map(product => (
+                  <div key={product.id} className="bg-[#121212] border border-white/5 rounded-[2rem] p-6 flex gap-6 items-center hover:border-amber-500/20 transition-all">
+                    {/* Fix 4: <Image /> instead of <img> */}
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 overflow-hidden shrink-0 relative">
+                      {product.image ? (
+                        <Image
+                          src={product.image}
+                          alt={product.name}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon size={20} className="text-white/20" />
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </section>
-
-        {/* ── 4. CUSTOM MILLING CTA ── */}
-        <section className="mb-24">
-          <div className="flex flex-col md:flex-row items-center gap-12 border-2 border-slate-100 rounded-[3rem] p-12 bg-slate-50/30">
-            <div className="flex-grow">
-              <div className="flex items-center gap-3 mb-4 text-amber-600">
-                <Settings size={32} />
-                <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">
-                  Tailored Production
-                </h2>
-              </div>
-              <p className="text-slate-500 max-w-md font-medium">
-                Have your staples milled to your exact texture and weight.
-                Direct from the source to your doorstep.
-              </p>
-            </div>
-            <button
-              onClick={() => setIsCustomModalOpen(true)}
-              className="bg-amber-500 hover:bg-slate-900 hover:text-white text-black font-black py-6 px-12 rounded-2xl uppercase tracking-widest transition-all"
-            >
-              Start Custom Milling
-            </button>
-          </div>
-        </section>
-
-        {/* ── 5. PRODUCT CATALOG ── */}
-        <section id="catalog" className="mb-24">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
-            <h2 className="text-4xl font-black uppercase tracking-tight text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-8">
-              The Collection
-            </h2>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                    selectedCategory === cat
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center items-center py-32">
-              <Loader2 size={40} className="animate-spin text-amber-500" />
-            </div>
-          ) : error ? (
-            <div className="text-center py-32">
-              <p className="text-red-400 font-bold">{error}</p>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-32">
-              <p className="text-slate-400 font-bold uppercase tracking-widest">
-                No products found
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {filteredProducts.map((product, idx) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.05 }}
-                >
-                  <ProductCard
-                    product={product}
-                    onAddToCart={() => handleAddToCart(product)}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── 6. HERITAGE ── */}
-        <section id="heritage" className="py-24 bg-slate-900 text-white rounded-[4rem] overflow-hidden my-24 relative">
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 blur-3xl rounded-full" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center px-16 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-5xl font-black leading-none uppercase mb-8">
-                Executive <br />
-                <span className="text-amber-500 italic font-serif">Oversight.</span>
-              </h2>
-              <p className="text-lg text-slate-400 font-medium mb-8">
-                Perfection is an asymptote — we are forever chasing it, forever closing
-                the gap. Our philosophy is rooted in an obsessive attention to detail that
-                borders on the unreasonable. This is not just a product; it is the physical
-                manifestation of our uncompromising standard.
-              </p>
-              <div className="flex items-center gap-4 py-6 border-y border-white/10">
-                <div className="bg-amber-500 text-black p-3 rounded-xl">
-                  <ShieldCheck size={24} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">
-                    Quality Assured
-                  </p>
-                  <p className="font-bold">Managed by Local Borga HQ</p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="relative h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5"
-            >
-              <img
-                src="/images/local-borga-headquarters-interior1.jpg"
-                alt="Local Borga HQ"
-                className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-60" />
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ── FOOTER ── */}
-        <footer className="mt-24 border-t border-slate-100 pt-16 text-center">
-          <Globe className="w-12 h-12 text-amber-500 mx-auto mb-6 animate-pulse" />
-          <h3 className="text-3xl font-black uppercase tracking-tighter mb-2">
-            🌍 Intercontinental Staples
-          </h3>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
-            Direct from Accra, Ghana • Shipping Globally
-          </p>
-          <div className="mt-12 text-[10px] font-black text-slate-300 uppercase tracking-[0.5em] pb-8">
-            © 2025 Local Borga Executive
-          </div>
-        </footer>
-      </div>
-
-      {/* ── CART DRAWER ── */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 z-[100] flex justify-end">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setIsCartOpen(false)}
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-8"
-            >
-              <div className="flex justify-between items-center mb-8 border-b pb-4">
-                <h2 className="text-2xl font-black uppercase">Your Order</h2>
-                <button onClick={() => setIsCartOpen(false)}><X /></button>
-              </div>
-
-              <div className="flex-grow overflow-y-auto space-y-4">
-                {cart.length === 0 ? (
-                  <p className="text-center text-slate-400 mt-20 font-bold uppercase tracking-widest">
-                    Basket is Empty
-                  </p>
-                ) : (
-                  cart.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-center p-6 bg-slate-50 rounded-3xl border border-slate-100"
-                    >
-                      <div className="flex-grow mr-4">
-                        <h4 className="font-black text-slate-900 uppercase text-sm">
-                          {item.name}
-                        </h4>
-                        {item.config?.millingStyle && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            {item.config.millingStyle} · {item.config.weightKg}kg
-                          </p>
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-black uppercase text-sm truncate">{product.name}</h4>
+                        {product.is_premium && (
+                          <span className="bg-amber-500/20 text-amber-500 text-[8px] font-black px-2 py-0.5 rounded-full uppercase shrink-0">Premium</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {item.type === 'SHELF' && (
-                          <>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="p-1 hover:bg-slate-200 rounded-full transition-colors"
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <span className="font-black w-5 text-center text-sm">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-1 hover:bg-slate-200 rounded-full transition-colors"
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </>
-                        )}
-                        <p className="font-black text-sm ml-1">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </p>
+                      <p className="text-amber-500 text-xs font-bold uppercase">{product.category}</p>
+                      <p className="text-slate-400 text-xs mt-1 truncate">{product.description}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xl font-black">${Number(product.price).toFixed(2)}</p>
+                      <div className="flex gap-2 mt-3 justify-end">
+                        {/* Fix 3: aria-labels */}
                         <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="p-1 hover:text-red-500 transition-colors"
+                          onClick={() => openEditProduct(product)}
+                          aria-label={`Edit ${product.name}`}
+                          className="p-2 bg-white/5 hover:bg-white/15 rounded-xl transition-all"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(product.id, product.name)}
+                          aria-label={`Delete ${product.name}`}
+                          className="p-2 bg-red-500/10 hover:bg-red-500/30 text-red-400 rounded-xl transition-all"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-
-              <div className="pt-6 border-t mt-6">
-                <div className="flex justify-between text-2xl font-black mb-6 uppercase tracking-tighter">
-                  <span>Total</span>
-                  <span>${totalAmount.toFixed(2)}</span>
-                </div>
-                <button className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest">
-                  Secure Checkout
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ── CUSTOM MILLING MODAL ── */}
-      <AnimatePresence>
-        {isCustomModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
-              onClick={() => setIsCustomModalOpen(false)}
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-lg bg-white rounded-[3rem] overflow-hidden"
-            >
-              <div className="bg-amber-500 p-8 text-black flex justify-between items-center">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                    Production Room
-                  </p>
-                  <h2 className="text-xl font-black uppercase tracking-tight">
-                    Custom Milling Request
-                  </h2>
-                </div>
-                <button onClick={() => setIsCustomModalOpen(false)}><X /></button>
-              </div>
-
-              <form onSubmit={handleCustomSubmit} className="p-10 space-y-8">
-                <div>
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">
-                    Staple Type
-                  </label>
-                  <select
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none"
-                    value={customForm.item}
-                    onChange={e => setCustomForm({ ...customForm, item: e.target.value })}
-                  >
-                    <option>Gari</option>
-                    <option>Cassava Flour</option>
-                    <option>Corn Flour</option>
-                    <option>Millet Flour</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-2">
-                    Milling Style
-                  </label>
-                  <select
-                    className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none"
-                    value={customForm.milling}
-                    onChange={e => setCustomForm({ ...customForm, milling: e.target.value })}
-                  >
-                    <option>Fine Grain</option>
-                    <option>Medium Grain</option>
-                    <option>Coarse Grain</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">
-                    Volume: {customForm.weight}kg —{' '}
-                    <span className="text-slate-700">
-                      ${(15.00 * customForm.weight / 5).toFixed(2)}
-                    </span>
-                  </label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    step="5"
-                    value={customForm.weight}
-                    className="w-full accent-amber-500"
-                    onChange={e =>
-                      setCustomForm({ ...customForm, weight: parseInt(e.target.value) })
-                    }
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-1">
-                    <span>5kg</span><span>50kg</span>
                   </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-amber-500 hover:text-black transition-all uppercase tracking-widest"
-                >
-                  Initialize Batch
-                </button>
-              </form>
-            </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </AnimatePresence>
-    </main>
-  );
-}
+      </div>
 
-// -------------------------------------------------------------------
-// Product Card
-// -------------------------------------------------------------------
-function ProductCard({
-  product,
-  onAddToCart,
-}: {
-  product: Product;
-  onAddToCart: () => void;
-}) {
-  return (
-    <div className="group border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white flex flex-col relative">
-      {product.is_premium && (
-        <div className="absolute top-4 right-4 z-10">
-          <span className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">
-            Limited Edition
-          </span>
+      {/* PRINTABLE LABEL (hidden) */}
+      <div className="hidden">
+        {activePrintOrder && <PrintableLabel ref={printRef} order={activePrintOrder} />}
+      </div>
+
+      {/* PRODUCT MODAL */}
+      {showProductModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setShowProductModal(false)} />
+          <div className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-[2rem] overflow-hidden">
+            <div className="bg-amber-500 p-6 text-black flex justify-between items-center">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Catalog Manager</p>
+                <h2 className="text-lg font-black uppercase">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
+              </div>
+              {/* Fix 3: aria-label on close button */}
+              <button onClick={() => setShowProductModal(false)} aria-label="Close product modal">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveProduct} className="p-8 space-y-5 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Product Name *</label>
+                <input type="text" value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })}
+                  placeholder="e.g. Premium White Gari"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-medium"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Price (USD) *</label>
+                  <input type="number" step="0.01" min="0" value={productForm.price} onChange={e => setProductForm({ ...productForm, price: e.target.value })}
+                    placeholder="25.00"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Category *</label>
+                  <input type="text" value={productForm.category} onChange={e => setProductForm({ ...productForm, category: e.target.value })}
+                    placeholder="e.g. GARI"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-medium uppercase"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Description</label>
+                <textarea value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+                  placeholder="Brief product description..." rows={2}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-medium resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Image Path</label>
+                <input type="text" value={productForm.image} onChange={e => setProductForm({ ...productForm, image: e.target.value })}
+                  placeholder="/images/product-name.jpg"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-mono text-sm"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Upload images to /public/images/ and reference the path here</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" id="is_premium" checked={productForm.is_premium as boolean}
+                  onChange={e => setProductForm({ ...productForm, is_premium: e.target.checked })}
+                  className="w-4 h-4 accent-amber-500"
+                />
+                <label htmlFor="is_premium" className="text-sm font-bold text-slate-300 cursor-pointer">
+                  Mark as Limited Edition / Premium
+                </label>
+              </div>
+              <button type="submit" disabled={savingProduct}
+                className="w-full py-4 bg-amber-500 text-black font-black uppercase tracking-widest rounded-xl hover:bg-amber-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingProduct ? 'Saving...' : editingProduct ? 'Save Changes' : 'Add to Catalog'}
+              </button>
+            </form>
+          </div>
         </div>
       )}
-      <div className="h-64 bg-slate-50 relative overflow-hidden">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
-      </div>
-      <div className="p-8 flex flex-col flex-grow">
-        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-2">
-          {product.category}
-        </span>
-        <h3 className="font-black text-slate-900 uppercase text-lg leading-tight">
-          {product.name}
-        </h3>
-        <p className="text-slate-500 text-xs mt-3 mb-6 font-medium line-clamp-2">
-          {product.description}
-        </p>
-        <div className="mt-auto pt-6 border-t flex items-center justify-between">
-          <span className="text-2xl font-black text-slate-900">
-            ${product.price.toFixed(2)}
-          </span>
-          <button
-            onClick={onAddToCart}
-            className="p-3 bg-slate-900 text-white rounded-xl hover:bg-amber-500 hover:text-black transition-all"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }
