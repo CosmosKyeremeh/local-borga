@@ -1,7 +1,6 @@
 'use client';
 
 // web-client/app/account/page.tsx
-
 // Customer's personal dashboard — order history, profile, logout
 
 import { useEffect, useState } from 'react';

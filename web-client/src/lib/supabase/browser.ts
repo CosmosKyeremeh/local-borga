@@ -1,3 +1,7 @@
+// web-client/src/lib/supabase/browser.ts
+// Client-side only. Uses ANON key — safe to expose to the browser.
+// Singleton pattern: one shared instance for the whole app.
+
 import { createClient } from '@supabase/supabase-js';
 
 const url  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
