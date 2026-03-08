@@ -15,8 +15,7 @@ interface LabelProps {
 
 export const PrintableLabel = React.forwardRef<HTMLDivElement, LabelProps>(
   ({ order }, ref) => {
-    // ✅ Uses env var — correct URL in both local dev and Vercel production
-    const appUrl     = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl     = process.env.NEXT_PUBLIC_APP_URL || 'https://local-borga.vercel.app';
     const trackingUrl = `${appUrl}/?track=${order.id}`;
 
     return (

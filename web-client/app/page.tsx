@@ -26,8 +26,16 @@ interface Product {
   is_premium?: boolean;
 }
 
+interface TrackedOrder {
+  id: number;
+  itemName: string;
+  status: string;
+  weightKg?: number;
+  millingStyle?: string;
+}
+
 export default function Home() {
-  const { cart, addToCart, removeFromCart, updateQuantity, totalAmount, cartCount } = useCart();
+  const { cart, addToCart, removeFromCart, updateQuantity, totalAmount, cartCount, clearCart } = useCart();
 
   const [products, setProducts]                   = useState<Product[]>([]);
   const [isLoading, setIsLoading]                 = useState(true);
@@ -39,7 +47,7 @@ export default function Home() {
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [customForm, setCustomForm]               = useState({ item: 'Gari', weight: 5, milling: 'Medium Grain' });
   const [trackingId, setTrackingId]               = useState('');
-  const [trackedOrder, setTrackedOrder]           = useState<any>(null);
+  const [trackedOrder, setTrackedOrder]           = useState<TrackedOrder | null>(null);
   const [isTrackLoading, setIsTrackLoading]       = useState(false);
 
   // Auth + checkout
@@ -48,6 +56,10 @@ export default function Home() {
   const [checkoutStep, setCheckoutStep]           = useState<'details' | 'confirm' | 'success'>('details');
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [completedOrderId, setCompletedOrderId]   = useState<number | null>(null);
+  const [demoCardNum, setDemoCardNum]             = useState('');
+  const [demoExpiry, setDemoExpiry]               = useState('');
+  const [demoCvv, setDemoCvv]                     = useState('');
+  const [paymentLoading, setPaymentLoading]       = useState(false);
   const [checkoutForm, setCheckoutForm]           = useState({
     name: '', email: '', phone: '', address: '', city: '', country: 'Ghana',
   });
@@ -172,16 +184,25 @@ export default function Home() {
       toast.error('Name, email and address are required');
       return;
     }
-    setIsCheckoutLoading(true);
-    try {
-      const shelfItems = cart.filter(i => i.type === 'SHELF');
-      const millingItems = cart.filter(i => i.type === 'CUSTOM_MILLING');
+    // Move to payment step
+    setCheckoutStep('confirm');
+  };
 
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!demoCardNum || !demoExpiry || !demoCvv) {
+      toast.error('Please fill in all payment fields');
+      return;
+    }
+    setPaymentLoading(true);
+    // Simulate payment processing delay
+    await new Promise(res => setTimeout(res, 2000));
+    try {
       const orderPayload = {
         orderType:      'shelf',
-        itemName:       shelfItems.length > 0
+        itemName:       cart.length > 0
                           ? `Cart Order (${cart.length} item${cart.length > 1 ? 's' : ''})`
-                          : millingItems[0]?.name ?? 'Order',
+                          : 'Order',
         totalPrice:     totalAmount,
         cartItems:      cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
         customerName:   checkoutForm.name,
@@ -194,7 +215,6 @@ export default function Home() {
         },
         userId: currentUser?.id ?? null,
       };
-
       const res = await fetch('/api/orders', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,7 +228,7 @@ export default function Home() {
     } catch {
       toast.error('Order failed. Please try again.');
     } finally {
-      setIsCheckoutLoading(false);
+      setPaymentLoading(false);
     }
   };
 
@@ -644,6 +664,134 @@ export default function Home() {
               transition={{ type: 'spring', damping: 28 }}
               className="relative w-full sm:max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden max-h-[95vh] flex flex-col"
             >
+              {/* PAYMENT STEP */}
+              {checkoutStep === 'confirm' && (
+                <>
+                  <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setCheckoutStep('details')}
+                        aria-label="Back to details"
+                        className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                      </button>
+                      <div>
+                        <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Payment</h2>
+                        <p className="text-xs text-slate-400 mt-0.5">Demo — no real charge</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setIsCheckoutOpen(false)} aria-label="Close checkout" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto flex-grow p-6 space-y-5">
+                    {/* Order summary pill */}
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Order Total</p>
+                        <p className="text-2xl font-black text-slate-900">${totalAmount.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Shipping to</p>
+                        <p className="text-sm font-bold text-slate-700">{checkoutForm.city || checkoutForm.country}</p>
+                      </div>
+                    </div>
+
+                    {/* Demo notice */}
+                    <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                      <span className="text-blue-500 text-lg shrink-0">ℹ️</span>
+                      <div>
+                        <p className="text-xs font-black text-blue-800 uppercase tracking-wide mb-0.5">Demo Payment</p>
+                        <p className="text-xs text-blue-600">This is a simulated payment. No real card will be charged. Use any test values below.</p>
+                      </div>
+                    </div>
+
+                    <form id="payment-form" onSubmit={handlePaymentSubmit} className="space-y-4">
+                      {/* Card number */}
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Card Number</label>
+                        <input
+                          type="text"
+                          value={demoCardNum}
+                          onChange={e => setDemoCardNum(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim())}
+                          placeholder="4242 4242 4242 4242"
+                          maxLength={19}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-mono text-slate-900 placeholder:text-slate-300"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Expiry</label>
+                          <input
+                            type="text"
+                            value={demoExpiry}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setDemoExpiry(v.length >= 3 ? `${v.slice(0,2)}/${v.slice(2)}` : v);
+                            }}
+                            placeholder="MM/YY"
+                            maxLength={5}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-mono text-slate-900 placeholder:text-slate-300"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">CVV</label>
+                          <input
+                            type="text"
+                            value={demoCvv}
+                            onChange={e => setDemoCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                            placeholder="123"
+                            maxLength={3}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-mono text-slate-900 placeholder:text-slate-300"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Card name */}
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Name on Card</label>
+                        <input
+                          type="text"
+                          defaultValue={checkoutForm.name}
+                          placeholder="KWAME ASANTE"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300 uppercase"
+                        />
+                      </div>
+
+                      {/* Accepted cards visual */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Accepted:</span>
+                        {['VISA', 'MC', 'AMEX'].map(card => (
+                          <span key={card} className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-md">{card}</span>
+                        ))}
+                        <span className="ml-auto text-[10px] text-green-500 font-bold flex items-center gap-1">🔒 SSL Secured</span>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="p-6 border-t border-slate-100 shrink-0">
+                    <button
+                      type="submit"
+                      form="payment-form"
+                      disabled={paymentLoading}
+                      className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {paymentLoading ? (
+                        <><Loader2 size={18} className="animate-spin" /> Processing Payment...</>
+                      ) : (
+                        `Pay $${totalAmount.toFixed(2)}`
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+
               {/* SUCCESS STATE */}
               {checkoutStep === 'success' && (
                 <div className="p-10 text-center">
