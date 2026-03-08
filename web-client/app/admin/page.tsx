@@ -7,7 +7,7 @@ import { useReactToPrint } from 'react-to-print';
 import Image from 'next/image';
 import {
   Package, CheckCircle, ChevronLeft, RefreshCcw, ShieldCheck,
-  TrendingUp, Printer, LogOut, Plus, Pencil, Trash2, X, ImageIcon
+  TrendingUp, Printer, LogOut, Plus, Pencil, Trash2, X, ImageIcon, Users, Mail, MapPin, Phone
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -45,12 +45,27 @@ interface SupabaseOrderRow {
   total_price: number;
   status: 'pending' | 'milling' | 'completed';
   created_at: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  shipping_address: { address?: string; city?: string; country?: string } | null;
+  order_type: string | null;
+}
+
+interface Customer {
+  email: string;
+  name: string | null;
+  phone: string | null;
+  shipping_address: { address?: string; city?: string; country?: string } | null;
+  orderCount: number;
+  totalSpent: number;
+  lastOrder: string;
 }
 
 const EMPTY_PRODUCT = { name: '', price: '', category: '', description: '', image: '', is_premium: false };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'customers'>('orders');
 
   const [orders, setOrders]   = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,6 +198,32 @@ export default function AdminDashboard() {
 
   // ── Analytics ─────────────────────────────────────────────────
   const totalRevenue = useMemo(() => orders.reduce((sum, o) => sum + o.totalPrice, 0), [orders]);
+
+  // ── Customers — derived from orders with customer_email ────────
+  const customers = useMemo<Customer[]>(() => {
+    const map = new Map<string, Customer>();
+    orders.forEach(o => {
+      const raw = o as unknown as SupabaseOrderRow;
+      if (!raw.customer_email) return;
+      const existing = map.get(raw.customer_email);
+      if (existing) {
+        existing.orderCount++;
+        existing.totalSpent += o.totalPrice;
+        if (o.createdAt > existing.lastOrder) existing.lastOrder = o.createdAt;
+      } else {
+        map.set(raw.customer_email, {
+          email:            raw.customer_email,
+          name:             raw.customer_name,
+          phone:            raw.customer_phone,
+          shipping_address: raw.shipping_address,
+          orderCount:       1,
+          totalSpent:       o.totalPrice,
+          lastOrder:        o.createdAt,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [orders]);
   const chartData = useMemo(() => {
     // Fix 1: typed accumulator, no `any`
     const groups = orders.reduce<Record<string, number>>((acc, o) => {
@@ -256,13 +297,16 @@ export default function AdminDashboard() {
 
         {/* TABS */}
         <div className="flex gap-2 mb-8">
-          {(['orders', 'products'] as const).map(tab => (
+          {(['orders', 'products', 'customers'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               aria-label={`Switch to ${tab} tab`}
               className={`px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-amber-500 text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-            >{tab}</button>
+            >
+              {tab === 'customers' && <span className="inline-flex items-center gap-2"><Users size={12} />{tab}</span>}
+              {tab !== 'customers' && tab}
+            </button>
           ))}
         </div>
 
@@ -410,7 +454,78 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* PRINTABLE LABEL (hidden) */}
+      {/* CUSTOMERS TAB */}
+      {activeTab === 'customers' && (
+        <div>
+          <div className="flex items-center gap-2 mb-6 px-4">
+            <Users size={14} className="text-amber-500" />
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">
+              {customers.length} Customer{customers.length !== 1 ? 's' : ''} — sorted by spend
+            </h3>
+          </div>
+
+          {customers.length === 0 ? (
+            <div className="py-32 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+              <Users size={48} className="mx-auto text-white/10 mb-4" />
+              <p className="text-slate-500 font-bold uppercase tracking-widest">No customers yet</p>
+              <p className="text-slate-600 text-xs mt-2">Customers will appear here once they place orders with their email.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {customers.map((customer, idx) => (
+                <div key={customer.email}
+                  className="bg-[#121212] border border-white/5 rounded-[2rem] p-6 hover:border-amber-500/20 transition-all"
+                >
+                  <div className="flex items-start gap-5">
+                    {/* Avatar */}
+                    <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                      <span className="text-amber-500 font-black text-lg">
+                        {(customer.name ?? customer.email)[0].toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-grow min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                        <div>
+                          <h4 className="font-black uppercase text-sm">{customer.name ?? 'Guest Customer'}</h4>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Mail size={11} className="text-slate-600" />
+                            <p className="text-slate-400 text-xs">{customer.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xl font-black text-amber-500">${customer.totalSpent.toFixed(2)}</p>
+                          <p className="text-[10px] text-slate-600 uppercase tracking-widest">{customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        {customer.phone && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-full">
+                            <Phone size={10} />{customer.phone}
+                          </div>
+                        )}
+                        {customer.shipping_address?.address && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 bg-white/5 px-3 py-1.5 rounded-full">
+                            <MapPin size={10} />
+                            {customer.shipping_address.address}
+                            {customer.shipping_address.city && `, ${customer.shipping_address.city}`}
+                            {customer.shipping_address.country && `, ${customer.shipping_address.country}`}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600 bg-white/5 px-3 py-1.5 rounded-full">
+                          Last order: {new Date(customer.lastOrder).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="hidden">
         {activePrintOrder && <PrintableLabel ref={printRef} order={activePrintOrder} />}
       </div>

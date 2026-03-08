@@ -7,13 +7,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   Settings, Globe, Loader2,
-  X, Plus, Minus, Trash2, Search, ShieldCheck, ShoppingCart, Menu
+  X, Plus, Minus, Trash2, Search, ShieldCheck, ShoppingCart, Menu, CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { supabaseBrowser } from '@/src/lib/supabase/browser';
 import { useCart } from '@/src/context/CartContext';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Product {
   id: number;
@@ -40,6 +41,43 @@ export default function Home() {
   const [trackingId, setTrackingId]               = useState('');
   const [trackedOrder, setTrackedOrder]           = useState<any>(null);
   const [isTrackLoading, setIsTrackLoading]       = useState(false);
+
+  // Auth + checkout
+  const [currentUser, setCurrentUser]             = useState<SupabaseUser | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen]       = useState(false);
+  const [checkoutStep, setCheckoutStep]           = useState<'details' | 'confirm' | 'success'>('details');
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [completedOrderId, setCompletedOrderId]   = useState<number | null>(null);
+  const [checkoutForm, setCheckoutForm]           = useState({
+    name: '', email: '', phone: '', address: '', city: '', country: 'Ghana',
+  });
+
+  // Auth session — prefill checkout if logged in
+  useEffect(() => {
+    supabaseBrowser.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        const u = data.session.user;
+        setCurrentUser(u);
+        setCheckoutForm(prev => ({
+          ...prev,
+          name:  u.user_metadata?.full_name ?? prev.name,
+          email: u.email ?? prev.email,
+        }));
+      }
+    });
+    const { data: listener } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      setCurrentUser(u);
+      if (u) {
+        setCheckoutForm(prev => ({
+          ...prev,
+          name:  u.user_metadata?.full_name ?? prev.name,
+          email: u.email ?? prev.email,
+        }));
+      }
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   // Supabase Realtime
   useEffect(() => {
@@ -121,12 +159,57 @@ export default function Home() {
     } catch { toast.error('Order Failed. Please try again.'); }
   };
 
-  // Fix 3: Checkout handler
+  // Fix 3: Checkout handler — opens checkout modal
   const handleCheckout = () => {
     if (cart.length === 0) return;
-    toast.info('Checkout coming soon!', {
-      description: 'Payment integration is in progress. Your cart is saved.',
-    });
+    setCheckoutStep('details');
+    setIsCheckoutOpen(true);
+  };
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkoutForm.name || !checkoutForm.email || !checkoutForm.address) {
+      toast.error('Name, email and address are required');
+      return;
+    }
+    setIsCheckoutLoading(true);
+    try {
+      const shelfItems = cart.filter(i => i.type === 'SHELF');
+      const millingItems = cart.filter(i => i.type === 'CUSTOM_MILLING');
+
+      const orderPayload = {
+        orderType:      'shelf',
+        itemName:       shelfItems.length > 0
+                          ? `Cart Order (${cart.length} item${cart.length > 1 ? 's' : ''})`
+                          : millingItems[0]?.name ?? 'Order',
+        totalPrice:     totalAmount,
+        cartItems:      cart.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+        customerName:   checkoutForm.name,
+        customerEmail:  checkoutForm.email,
+        customerPhone:  checkoutForm.phone || null,
+        shippingAddress: {
+          address: checkoutForm.address,
+          city:    checkoutForm.city,
+          country: checkoutForm.country,
+        },
+        userId: currentUser?.id ?? null,
+      };
+
+      const res = await fetch('/api/orders', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(orderPayload),
+      });
+      if (!res.ok) throw new Error('Order failed');
+      const result = await res.json();
+      setCompletedOrderId(result.order.id);
+      setCheckoutStep('success');
+      clearCart();
+    } catch {
+      toast.error('Order failed. Please try again.');
+    } finally {
+      setIsCheckoutLoading(false);
+    }
   };
 
   return (
@@ -145,6 +228,16 @@ export default function Home() {
             {['catalog', 'tracking', 'heritage'].map(s => (
               <a key={s} href={`#${s}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">{s}</a>
             ))}
+            {currentUser ? (
+              <Link href="/account" className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 hover:text-amber-400 transition-colors flex items-center gap-1">
+                <span className="w-5 h-5 bg-amber-500 text-black rounded-full flex items-center justify-center text-[8px] font-black">
+                  {(currentUser.user_metadata?.full_name ?? currentUser.email ?? 'U')[0].toUpperCase()}
+                </span>
+                Account
+              </Link>
+            ) : (
+              <Link href="/auth" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">Sign In</Link>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -531,6 +624,182 @@ export default function Home() {
                 </div>
                 <button type="submit" className="w-full py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-amber-500 hover:text-black transition-all uppercase tracking-widest">Initialize Batch</button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CHECKOUT MODAL ── */}
+      <AnimatePresence>
+        {isCheckoutOpen && (
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+              onClick={() => checkoutStep !== 'success' && setIsCheckoutOpen(false)}
+            />
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28 }}
+              className="relative w-full sm:max-w-lg bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden max-h-[95vh] flex flex-col"
+            >
+              {/* SUCCESS STATE */}
+              {checkoutStep === 'success' && (
+                <div className="p-10 text-center">
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle size={32} className="text-white" />
+                  </div>
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 mb-2">Order Placed!</h2>
+                  <p className="text-slate-400 font-medium mb-2">Your tracking ID is:</p>
+                  <p className="text-4xl font-black text-amber-500 font-mono mb-6">#{completedOrderId}</p>
+                  <p className="text-slate-400 text-sm mb-8">We'll begin processing your order shortly. Track progress using your ID on the store page.</p>
+
+                  {/* Prompt to create account if not logged in */}
+                  {!currentUser && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 text-left">
+                      <p className="text-sm font-black text-slate-900 mb-1">Save your details for next time?</p>
+                      <p className="text-xs text-slate-500 mb-4">Create a free account to track all your orders in one place.</p>
+                      <Link
+                        href={`/auth?redirect=/account`}
+                        onClick={() => setIsCheckoutOpen(false)}
+                        className="inline-block px-6 py-3 bg-amber-500 text-black font-black rounded-xl uppercase text-xs tracking-widest hover:bg-amber-400 transition-all"
+                      >
+                        Create Account →
+                      </Link>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setIsCheckoutOpen(false)}
+                    className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all"
+                  >
+                    Back to Store
+                  </button>
+                </div>
+              )}
+
+              {/* CHECKOUT FORM */}
+              {checkoutStep === 'details' && (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+                    <div>
+                      <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Checkout</h2>
+                      <p className="text-xs text-slate-400 mt-0.5">{cartCount} item{cartCount > 1 ? 's' : ''} · ${totalAmount.toFixed(2)}</p>
+                    </div>
+                    <button onClick={() => setIsCheckoutOpen(false)} aria-label="Close checkout" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto flex-grow">
+                    {/* Sign in nudge if not logged in */}
+                    {!currentUser && (
+                      <div className="mx-6 mt-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+                        <p className="text-xs text-slate-500 font-medium">Have an account? Your details will be prefilled.</p>
+                        <Link
+                          href="/auth?redirect=/"
+                          className="text-[10px] font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 transition-colors whitespace-nowrap ml-4"
+                        >
+                          Sign In →
+                        </Link>
+                      </div>
+                    )}
+                    {currentUser && (
+                      <div className="mx-6 mt-5 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                          <span className="text-white text-[9px] font-black">{(currentUser.user_metadata?.full_name ?? currentUser.email ?? 'U')[0].toUpperCase()}</span>
+                        </div>
+                        <p className="text-xs text-green-800 font-bold">Signed in as {currentUser.email}</p>
+                      </div>
+                    )}
+
+                    <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="p-6 space-y-4">
+                      {/* Cart summary */}
+                      <div className="bg-slate-50 rounded-2xl p-4 space-y-2 mb-2">
+                        {cart.map(item => (
+                          <div key={item.id} className="flex justify-between text-sm">
+                            <span className="font-bold text-slate-700">{item.quantity}× {item.name}</span>
+                            <span className="font-black">${(item.price * item.quantity).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-base font-black pt-2 border-t border-slate-200">
+                          <span>Total</span><span className="text-amber-500">${totalAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Full Name *</label>
+                          <input type="text" required value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})}
+                            placeholder="Kwame Asante"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Email *</label>
+                          <input type="email" required value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})}
+                            placeholder="you@example.com"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Phone</label>
+                        <input type="tel" value={checkoutForm.phone} onChange={e => setCheckoutForm({...checkoutForm, phone: e.target.value})}
+                          placeholder="+233 XX XXX XXXX"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Street Address *</label>
+                        <input type="text" required value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})}
+                          placeholder="123 Liberation Rd"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">City</label>
+                          <input type="text" value={checkoutForm.city} onChange={e => setCheckoutForm({...checkoutForm, city: e.target.value})}
+                            placeholder="Accra"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900 placeholder:text-slate-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Country</label>
+                          <select value={checkoutForm.country} onChange={e => setCheckoutForm({...checkoutForm, country: e.target.value})}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-amber-500 transition-colors font-medium text-slate-900"
+                          >
+                            <option>Ghana</option><option>United Kingdom</option><option>United States</option>
+                            <option>Canada</option><option>Germany</option><option>Netherlands</option><option>Other</option>
+                          </select>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Submit — outside form scroll area */}
+                  <div className="p-6 border-t border-slate-100 shrink-0">
+                    <button
+                      type="submit"
+                      form="checkout-form"
+                      disabled={isCheckoutLoading}
+                      className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isCheckoutLoading
+                        ? <><Loader2 size={18} className="animate-spin" /> Placing Order...</>
+                        : `Place Order · $${totalAmount.toFixed(2)}`
+                      }
+                    </button>
+                    <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-3">🔒 Your details are secure</p>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}
