@@ -28,18 +28,18 @@ interface Product {
 export default function Home() {
   const { cart, addToCart, removeFromCart, updateQuantity, totalAmount, cartCount } = useCart();
 
-  const [products, setProducts]                 = useState<Product[]>([]);
-  const [isLoading, setIsLoading]               = useState(true);
-  const [error, setError]                       = useState<string | null>(null);
-  const [isCartOpen, setIsCartOpen]             = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery]           = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [products, setProducts]                   = useState<Product[]>([]);
+  const [isLoading, setIsLoading]                 = useState(true);
+  const [error, setError]                         = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen]               = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen]   = useState(false);
+  const [searchQuery, setSearchQuery]             = useState('');
+  const [selectedCategory, setSelectedCategory]   = useState('All');
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
-  const [customForm, setCustomForm] = useState({ item: 'Gari', weight: 5, milling: 'Medium Grain' });
-  const [trackingId, setTrackingId]             = useState('');
-  const [trackedOrder, setTrackedOrder]         = useState<any>(null);
-  const [isTrackLoading, setIsTrackLoading]     = useState(false);
+  const [customForm, setCustomForm]               = useState({ item: 'Gari', weight: 5, milling: 'Medium Grain' });
+  const [trackingId, setTrackingId]               = useState('');
+  const [trackedOrder, setTrackedOrder]           = useState<any>(null);
+  const [isTrackLoading, setIsTrackLoading]       = useState(false);
 
   // Supabase Realtime
   useEffect(() => {
@@ -70,7 +70,6 @@ export default function Home() {
     (selectedCategory === 'All' || p.category === selectedCategory)
   );
 
-  // Cart no longer auto-opens — toast with "View Cart" action instead
   const handleAddToCart = (product: Product) => {
     addToCart({
       id: product.id.toString(), name: product.name, price: product.price,
@@ -122,16 +121,23 @@ export default function Home() {
     } catch { toast.error('Order Failed. Please try again.'); }
   };
 
+  // Fix 3: Checkout handler
+  const handleCheckout = () => {
+    if (cart.length === 0) return;
+    toast.info('Checkout coming soon!', {
+      description: 'Payment integration is in progress. Your cart is saved.',
+    });
+  };
+
   return (
     <main className="bg-white min-h-screen">
 
-      {/* NAVBAR */}
+      {/* ── NAVBAR ── */}
       <motion.nav initial={{ y: -100 }} animate={{ y: 0 }}
         className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-4"
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-3">
-            {/* Fix 4: <Image /> for logo */}
             <Image src="/logo.jpg" alt="Local Borga logo" width={40} height={40} className="rounded-sm object-contain" />
             <span className="font-black uppercase tracking-tighter text-xl text-slate-900">Local Borga</span>
           </Link>
@@ -141,7 +147,6 @@ export default function Home() {
             ))}
           </div>
           <div className="flex items-center gap-3">
-            {/* Fix 3: aria-label on cart button */}
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label={`Open cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
@@ -154,7 +159,6 @@ export default function Home() {
                 </span>
               )}
             </button>
-            {/* Fix 3: aria-label on mobile menu button */}
             <button
               className="md:hidden p-2"
               aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
@@ -183,7 +187,7 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-6 pt-32 pb-16">
 
-        {/* HERO */}
+        {/* ── HERO ── */}
         <section className="mb-24">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500 mb-6">Direct from Accra, Ghana</p>
@@ -198,7 +202,7 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* SEARCH */}
+        {/* ── SEARCH ── */}
         <section className="mb-16">
           <div className="relative max-w-xl">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
@@ -209,27 +213,39 @@ export default function Home() {
           </div>
         </section>
 
-        {/* TRACKING */}
+        {/* ── TRACKING ── Fix 2: form stacks on mobile, button no longer overflows */}
         <section id="tracking" className="mb-24">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="bg-slate-900 rounded-[3rem] p-12 text-white">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
-              <div className="flex-grow">
+          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+            className="bg-slate-900 rounded-[3rem] p-8 md:p-12 text-white"
+          >
+            <div className="flex flex-col gap-8">
+              <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500 mb-2">Live Production</p>
                 <h2 className="text-3xl font-black uppercase tracking-tight">Track Your Order</h2>
                 <p className="text-slate-400 mt-2 font-medium">Enter your tracking ID to see real-time production status.</p>
               </div>
-              <form onSubmit={handleTrackOrder} className="flex gap-3 w-full md:w-auto">
-                <input type="text" placeholder="Tracking ID..." value={trackingId} onChange={e => setTrackingId(e.target.value)}
-                  className="flex-grow md:w-56 px-6 py-4 bg-white/10 rounded-2xl border border-white/10 text-white placeholder:text-slate-500 font-mono outline-none focus:border-amber-500 transition-colors"
+              {/* Fix 2: flex-col on mobile, flex-row on sm+ — button is always full-width on mobile */}
+              <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-3 w-full">
+                <input
+                  type="text"
+                  placeholder="Tracking ID..."
+                  value={trackingId}
+                  onChange={e => setTrackingId(e.target.value)}
+                  className="flex-grow px-6 py-4 bg-white/10 rounded-2xl border border-white/10 text-white placeholder:text-slate-500 font-mono outline-none focus:border-amber-500 transition-colors"
                 />
-                <button type="submit" disabled={isTrackLoading} className="px-8 py-4 bg-amber-500 text-black font-black rounded-2xl uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
-                  {isTrackLoading ? <Loader2 size={20} className="animate-spin" /> : 'Track'}
+                <button
+                  type="submit"
+                  disabled={isTrackLoading}
+                  className="sm:shrink-0 px-10 py-4 bg-amber-500 text-black font-black rounded-2xl uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50"
+                >
+                  {isTrackLoading ? <Loader2 size={20} className="animate-spin mx-auto" /> : 'Track'}
                 </button>
               </form>
             </div>
             <AnimatePresence>
               {trackedOrder && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                   className="mt-8 pt-8 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-6"
                 >
                   {[
@@ -249,18 +265,18 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* CUSTOM MILLING */}
+        {/* ── CUSTOM MILLING ── */}
         <section className="mb-24">
           <div className="flex flex-col md:flex-row items-center gap-12 border-2 border-slate-100 rounded-[3rem] p-12 bg-slate-50/30">
             <div className="flex-grow">
               <div className="flex items-center gap-3 mb-4 text-amber-600"><Settings size={32} /><h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">Tailored Production</h2></div>
               <p className="text-slate-500 max-w-md font-medium">Have your staples milled to your exact texture and weight. Direct from the source to your doorstep.</p>
             </div>
-            <button onClick={() => setIsCustomModalOpen(true)} className="bg-amber-500 hover:bg-slate-900 hover:text-white text-black font-black py-6 px-12 rounded-2xl uppercase tracking-widest transition-all">Start Custom Milling</button>
+            <button onClick={() => setIsCustomModalOpen(true)} className="bg-amber-500 hover:bg-slate-900 hover:text-white text-black font-black py-6 px-12 rounded-2xl uppercase tracking-widest transition-all whitespace-nowrap">Start Custom Milling</button>
           </div>
         </section>
 
-        {/* CATALOG */}
+        {/* ── CATALOG ── */}
         <section id="catalog" className="mb-24">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
             <h2 className="text-4xl font-black uppercase tracking-tight text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-8">The Collection</h2>
@@ -289,13 +305,55 @@ export default function Home() {
           )}
         </section>
 
-        {/* HERITAGE */}
-        <section id="heritage" className="py-24 bg-slate-900 text-white rounded-[4rem] overflow-hidden my-24 relative">
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 blur-3xl rounded-full" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center px-16 relative z-10">
-            <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-              <h2 className="text-5xl font-black leading-none uppercase mb-8">Executive <br /><span className="text-amber-500 italic font-serif">Oversight.</span></h2>
-              <p className="text-lg text-slate-400 font-medium mb-8">Perfection is an asymptote — we are forever chasing it, forever closing the gap.</p>
+        {/* ── HERITAGE ── Fix 1: Reimagined for mobile */}
+        <section id="heritage" className="my-24 overflow-hidden rounded-[3rem] lg:rounded-[4rem]">
+
+          {/* Mobile: full-bleed image with text overlay */}
+          <div className="relative lg:hidden h-[480px]">
+            <Image
+              src="/images/local-borga-headquarters-interior1.jpg"
+              alt="Local Borga headquarters interior"
+              fill
+              sizes="100vw"
+              className="object-cover grayscale"
+              priority={false}
+            />
+            {/* Dark gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/70 to-slate-900/20" />
+            {/* Text pinned to bottom */}
+            <div className="absolute bottom-0 left-0 right-0 p-8">
+              <h2 className="text-4xl font-black leading-none uppercase text-white mb-3">
+                Executive <span className="text-amber-500 italic font-serif">Oversight.</span>
+              </h2>
+              <p className="text-slate-400 text-sm font-medium mb-5 max-w-sm">
+                Perfection is an asymptote — we are forever chasing it, forever closing the gap.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-500 text-black p-2 rounded-xl"><ShieldCheck size={18} /></div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">Quality Assured</p>
+                  <p className="text-white text-sm font-bold">Managed by Local Borga HQ</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop: original two-column layout */}
+          <div className="hidden lg:grid grid-cols-2 gap-0 bg-slate-900 text-white min-h-[600px]">
+            {/* Ambient glow */}
+            <div className="absolute top-0 right-0 w-1/2 h-full bg-amber-500/5 blur-3xl rounded-full pointer-events-none" />
+
+            {/* Text column */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
+              className="flex flex-col justify-center px-16 py-24 relative z-10"
+            >
+              <h2 className="text-5xl font-black leading-none uppercase mb-8">
+                Executive <br /><span className="text-amber-500 italic font-serif">Oversight.</span>
+              </h2>
+              <p className="text-lg text-slate-400 font-medium mb-8">
+                Perfection is an asymptote — we are forever chasing it, forever closing the gap. Our philosophy is rooted in an obsessive attention to detail that borders on the unreasonable.
+              </p>
               <div className="flex items-center gap-4 py-6 border-y border-white/10">
                 <div className="bg-amber-500 text-black p-3 rounded-xl"><ShieldCheck size={24} /></div>
                 <div>
@@ -304,23 +362,25 @@ export default function Home() {
                 </div>
               </div>
             </motion.div>
-            {/* Fix 4: <Image /> with fill for heritage section */}
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
-              className="relative h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5"
+
+            {/* Image column */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
+              className="relative overflow-hidden"
             >
               <Image
                 src="/images/local-borga-headquarters-interior1.jpg"
                 alt="Local Borga headquarters interior"
                 fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
+                sizes="50vw"
                 className="object-cover grayscale hover:grayscale-0 transition-all duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-60" />
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 to-transparent" />
             </motion.div>
           </div>
         </section>
 
-        {/* FOOTER */}
+        {/* ── FOOTER ── */}
         <footer className="mt-24 border-t border-slate-100 pt-16 text-center">
           <Globe className="w-12 h-12 text-amber-500 mx-auto mb-6 animate-pulse" />
           <h3 className="text-3xl font-black uppercase tracking-tighter mb-2">🌍 Intercontinental Staples</h3>
@@ -332,65 +392,122 @@ export default function Home() {
         </footer>
       </div>
 
-      {/* CART DRAWER */}
+      {/* ── CART DRAWER ── */}
       <AnimatePresence>
         {isCartOpen && (
           <div className="fixed inset-0 z-[100] flex justify-end">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
-            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25 }} className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsCartOpen(false)}
+            />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25 }}
+              className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-8"
+            >
               <div className="flex justify-between items-center mb-8 border-b pb-4">
-                <h2 className="text-2xl font-black uppercase">Your Order</h2>
-                {/* Fix 3: aria-label */}
-                <button onClick={() => setIsCartOpen(false)} aria-label="Close cart"><X /></button>
+                <div>
+                  <h2 className="text-2xl font-black uppercase">Your Order</h2>
+                  {cartCount > 0 && <p className="text-xs text-slate-400 font-bold mt-0.5">{cartCount} item{cartCount > 1 ? 's' : ''}</p>}
+                </div>
+                <button onClick={() => setIsCartOpen(false)} aria-label="Close cart"
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                ><X size={20} /></button>
               </div>
-              <div className="flex-grow overflow-y-auto space-y-4">
+
+              <div className="flex-grow overflow-y-auto space-y-3">
                 {cart.length === 0 ? (
-                  <p className="text-center text-slate-400 mt-20 font-bold uppercase tracking-widest">Basket is Empty</p>
+                  <div className="text-center mt-20">
+                    <ShoppingCart size={40} className="mx-auto text-slate-200 mb-4" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Basket is Empty</p>
+                  </div>
                 ) : cart.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                    <div className="flex-grow mr-4">
-                      <h4 className="font-black text-slate-900 uppercase text-sm">{item.name}</h4>
-                      {item.config?.millingStyle && <p className="text-xs text-slate-500 mt-1">{item.config.millingStyle} · {item.config.weightKg}kg</p>}
+                  <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-grow mr-3">
+                        <h4 className="font-black text-slate-900 uppercase text-sm leading-tight">{item.name}</h4>
+                        {item.config?.millingStyle && (
+                          <p className="text-xs text-slate-500 mt-1">{item.config.millingStyle} · {item.config.weightKg}kg</p>
+                        )}
+                      </div>
+                      {/* Fix 3: Delete button — visible red tint */}
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        aria-label={`Remove ${item.name} from cart`}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 rounded-lg transition-colors shrink-0"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {item.type === 'SHELF' && (
-                        <>
-                          {/* Fix 3: aria-labels on quantity buttons */}
-                          <button onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label={`Decrease quantity of ${item.name}`} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><Minus size={14} /></button>
-                          <span className="font-black w-5 text-center text-sm">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label={`Increase quantity of ${item.name}`} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><Plus size={14} /></button>
-                        </>
+
+                    <div className="flex items-center justify-between">
+                      {/* Fix 3: Quantity controls — visible with bg */}
+                      {item.type === 'SHELF' ? (
+                        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            aria-label={`Decrease quantity of ${item.name}`}
+                            className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-700 rounded-lg transition-colors font-bold"
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <span className="font-black text-slate-900 w-8 text-center text-sm">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            aria-label={`Increase quantity of ${item.name}`}
+                            className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-amber-500 hover:text-black text-slate-700 rounded-lg transition-colors font-bold"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 bg-amber-50 px-3 py-1.5 rounded-lg">Custom Order</span>
                       )}
-                      <p className="font-black text-sm ml-1">${(item.price * item.quantity).toFixed(2)}</p>
-                      <button onClick={() => removeFromCart(item.id)} aria-label={`Remove ${item.name} from cart`} className="p-1 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                      {/* Fix 3: Price — bold and clearly visible */}
+                      <p className="font-black text-slate-900 text-base">${(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="pt-6 border-t mt-6">
-                <div className="flex justify-between text-2xl font-black mb-6 uppercase tracking-tighter">
-                  <span>Total</span><span>${totalAmount.toFixed(2)}</span>
+
+              <div className="pt-5 border-t mt-5 space-y-4">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">Order Total</span>
+                  <span className="text-3xl font-black text-slate-900">${totalAmount.toFixed(2)}</span>
                 </div>
-                <button className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest">Secure Checkout</button>
+                {/* Fix 3: Checkout button with onClick handler */}
+                <button
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0}
+                  className="w-full py-5 bg-amber-500 text-black font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Secure Checkout
+                </button>
+                <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">🔒 Encrypted & Secure</p>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* CUSTOM MILLING MODAL */}
+      {/* ── CUSTOM MILLING MODAL ── */}
       <AnimatePresence>
         {isCustomModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsCustomModalOpen(false)} />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-lg bg-white rounded-[3rem] overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+              onClick={() => setIsCustomModalOpen(false)}
+            />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-lg bg-white rounded-[3rem] overflow-hidden"
+            >
               <div className="bg-amber-500 p-8 text-black flex justify-between items-center">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Production Room</p>
                   <h2 className="text-xl font-black uppercase tracking-tight">Custom Milling Request</h2>
                 </div>
-                {/* Fix 3: aria-label */}
-                <button onClick={() => setIsCustomModalOpen(false)} aria-label="Close custom milling modal"><X /></button>
+                <button onClick={() => setIsCustomModalOpen(false)} aria-label="Close custom milling modal">
+                  <X />
+                </button>
               </div>
               <form onSubmit={handleCustomSubmit} className="p-10 space-y-8">
                 <div>
@@ -422,7 +539,6 @@ export default function Home() {
   );
 }
 
-// Fix 3 + 4: aria-labels and <Image /> in ProductCard
 function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: () => void }) {
   return (
     <div className="group border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white flex flex-col relative">
@@ -431,7 +547,6 @@ function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: 
           <span className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">Limited Edition</span>
         </div>
       )}
-      {/* Fix 4: <Image /> with fill */}
       <div className="h-64 bg-slate-50 relative overflow-hidden">
         <Image
           src={product.image}
@@ -447,7 +562,6 @@ function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: 
         <p className="text-slate-500 text-xs mt-3 mb-6 font-medium line-clamp-2">{product.description}</p>
         <div className="mt-auto pt-6 border-t flex items-center justify-between">
           <span className="text-2xl font-black text-slate-900">${product.price.toFixed(2)}</span>
-          {/* Fix 3: aria-label on add to cart */}
           <button
             onClick={onAddToCart}
             aria-label={`Add ${product.name} to cart`}
