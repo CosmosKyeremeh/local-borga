@@ -1,12 +1,14 @@
 'use client';
 
+// web-client/app/page.tsx
+
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   Settings, Globe, Loader2, X, Plus, Minus, Trash2,
   Search, ShieldCheck, ShoppingCart, Menu, CheckCircle,
-  Printer, ArrowLeft
+  Printer, ArrowLeft, Tractor,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +27,7 @@ interface Product {
   description: string;
   image: string;
   is_premium?: boolean;
+  stock_quantity?: number;
 }
 
 interface TrackedOrder {
@@ -357,6 +360,10 @@ export default function Home() {
             {['catalog', 'tracking', 'heritage'].map(s => (
               <a key={s} href={`#${s}`} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-amber-500 transition-colors">{s}</a>
             ))}
+            <Link href="/farm-tools"
+              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-500 transition-colors">
+              <Tractor size={12} /> Farm Tools
+            </Link>
             {currentUser ? (
               <Link href="/account" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 hover:text-amber-400 transition-colors">
                 <span className="w-5 h-5 bg-amber-500 text-black rounded-full flex items-center justify-center text-[8px] font-black">
@@ -394,6 +401,10 @@ export default function Home() {
                 {['catalog', 'tracking', 'heritage'].map(s => (
                   <a key={s} href={`#${s}`} onClick={() => setIsMobileMenuOpen(false)} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{s}</a>
                 ))}
+                <Link href="/farm-tools" onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-green-600">
+                  <Tractor size={12} /> Farm Tools
+                </Link>
                 {currentUser
                   ? <Link href="/account" className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">My Account</Link>
                   : <Link href="/auth" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Sign In</Link>
@@ -933,26 +944,86 @@ export default function Home() {
 }
 
 // ── Product Card ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Makes the card image + name clickable to /products/[id]
+// The Add button still adds directly to cart without navigating away.
+// ─────────────────────────────────────────────────────────────────────────────
+
 function ProductCard({ product, onAddToCart }: { product: Product; onAddToCart: () => void }) {
+  const stock      = product.stock_quantity ?? 99;
+  const outOfStock = stock === 0;
+  const lowStock   = stock > 0 && stock <= 5;
+
   return (
     <div className="group border border-slate-100 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white flex flex-col relative">
       {product.is_premium && (
         <div className="absolute top-4 right-4 z-10">
-          <span className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">Limited Edition</span>
+          <span className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-lg">
+            Limited Edition
+          </span>
         </div>
       )}
-      <div className="h-64 bg-slate-50 relative overflow-hidden">
-        <Image src={product.image} alt={product.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover transition-transform duration-700 group-hover:scale-110" />
-      </div>
+
+      {outOfStock && (
+        <div className="absolute inset-0 z-20 bg-white/70 backdrop-blur-[2px] flex items-center justify-center rounded-[2rem]">
+          <span className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest px-5 py-2.5 rounded-full shadow-xl">
+            Out of Stock
+          </span>
+        </div>
+      )}
+
+      {/* Clickable image → detail page */}
+      <Link href={`/products/${product.id}`} className="block h-64 bg-slate-50 relative overflow-hidden">
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          className={`object-cover transition-transform duration-700 group-hover:scale-110 ${outOfStock ? 'grayscale' : ''}`}
+        />
+      </Link>
+
       <div className="p-8 flex flex-col flex-grow">
-        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-2">{product.category}</span>
-        <h3 className="font-black text-slate-900 uppercase text-lg leading-tight">{product.name}</h3>
-        <p className="text-slate-500 text-xs mt-3 mb-6 font-medium line-clamp-2">{product.description}</p>
+        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-2">
+          {product.category}
+        </span>
+
+        {/* Clickable name → detail page */}
+        <Link href={`/products/${product.id}`}>
+          <h3 className="font-black text-slate-900 uppercase text-lg leading-tight hover:text-amber-500 transition-colors">
+            {product.name}
+          </h3>
+        </Link>
+
+        <p className="text-slate-500 text-xs mt-3 mb-4 font-medium line-clamp-2">
+          {product.description}
+        </p>
+
+        {/* Stock indicator */}
+        {!outOfStock && (
+          <div className="mb-4">
+            {lowStock ? (
+              <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-red-500">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                Only {stock} left
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-green-600">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                In Stock
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="mt-auto pt-6 border-t flex items-center justify-between">
           <span className="text-2xl font-black text-slate-900">${product.price.toFixed(2)}</span>
-          <button onClick={onAddToCart} aria-label={`Add ${product.name} to cart`}
-            className="p-3 bg-slate-900 text-white rounded-xl hover:bg-amber-500 hover:text-black transition-all">
+          <button
+            onClick={onAddToCart}
+            disabled={outOfStock}
+            aria-label={`Add ${product.name} to cart`}
+            className="p-3 bg-slate-900 text-white rounded-xl hover:bg-amber-500 hover:text-black transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-white"
+          >
             <Plus size={20} />
           </button>
         </div>
