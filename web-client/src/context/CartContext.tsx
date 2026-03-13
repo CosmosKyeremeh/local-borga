@@ -3,20 +3,21 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 
 // -------------------------------------------------------------------
-// Types — unified to cover both storefront and admin usage
+// Types
+// SHELF         = regular product from food catalog
+// CUSTOM_MILLING= custom production order
+// FARM_TOOL     = equipment from the farm-tools storefront
 // -------------------------------------------------------------------
 
-// SHELF = regular product from catalog
-// CUSTOM_MILLING = custom production order
-export type ItemType = 'SHELF' | 'CUSTOM_MILLING';
+export type ItemType = 'SHELF' | 'CUSTOM_MILLING' | 'FARM_TOOL';
 
 export interface CartItem {
   id: string;
   name: string;
   price: number;
   image: string;
-  category: string;      // Free-form string (e.g. 'GARI', 'FLOUR', 'CUSTOM')
-  type: ItemType;        // Controls cart behaviour (stack vs unique)
+  category: string;
+  type: ItemType;
   quantity: number;
   description?: string;
   config?: {
@@ -34,12 +35,8 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   totalAmount: number;
-  cartCount: number;     // Total number of items (sum of quantities)
+  cartCount: number;
 }
-
-// -------------------------------------------------------------------
-// Context
-// -------------------------------------------------------------------
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -48,14 +45,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = (newItem: CartItem) => {
     setCart(prev => {
-      // SHELF items: stack quantity if already in cart
-      if (newItem.type === 'SHELF') {
+      // SHELF and FARM_TOOL items: stack quantity if already in cart
+      if (newItem.type === 'SHELF' || newItem.type === 'FARM_TOOL') {
         const existing = prev.find(
-          item => item.id === newItem.id && item.type === 'SHELF'
+          item => item.id === newItem.id && item.type === newItem.type
         );
         if (existing) {
           return prev.map(item =>
-            item.id === newItem.id && item.type === 'SHELF'
+            item.id === newItem.id && item.type === newItem.type
               ? { ...item, quantity: item.quantity + newItem.quantity }
               : item
           );
@@ -70,13 +67,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCart(prev => prev.filter(item => item.id !== id));
 
   const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(id);
-      return;
-    }
-    setCart(prev =>
-      prev.map(item => (item.id === id ? { ...item, quantity } : item))
-    );
+    if (quantity <= 0) { removeFromCart(id); return; }
+    setCart(prev => prev.map(item => item.id === id ? { ...item, quantity } : item));
   };
 
   const clearCart = () => setCart([]);
@@ -92,15 +84,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   return (
-    <CartContext.Provider value={{
-      cart,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      totalAmount,
-      cartCount,
-    }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, totalAmount, cartCount }}>
       {children}
     </CartContext.Provider>
   );
