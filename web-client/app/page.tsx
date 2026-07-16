@@ -529,7 +529,7 @@ export default function Home() {
         <section id="heritage" className="my-24 overflow-hidden rounded-[3rem] lg:rounded-[4rem]">
           {/* Mobile */}
           <div className="relative lg:hidden h-[480px]">
-            <Image src="/images/local-borga-headquarters-interior1.jpg" alt="Local Borga HQ" fill sizes="100vw" className="object-cover grayscale" />
+            <Image src="/images/foodStore/local-borga-headquarters-interior1.jpg" alt="Local Borga HQ" fill sizes="100vw" className="object-cover grayscale" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/70 to-slate-900/20" />
             <div className="absolute bottom-0 left-0 right-0 p-8">
               <h2 className="text-4xl font-black leading-none uppercase text-white mb-3">Executive <span className="text-amber-500 italic font-serif">Oversight.</span></h2>
@@ -559,7 +559,7 @@ export default function Home() {
               </div>
             </motion.div>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} className="relative overflow-hidden">
-              <Image src="/images/local-borga-headquarters-interior1.jpg" alt="Local Borga HQ" fill sizes="50vw" className="object-cover grayscale hover:grayscale-0 transition-all duration-700" />
+              <Image src="/images/foodStore/local-borga-headquarters-interior1.jpg" alt="Local Borga HQ" fill sizes="50vw" className="object-cover grayscale hover:grayscale-0 transition-all duration-700" />
               <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 to-transparent" />
             </motion.div>
           </div>

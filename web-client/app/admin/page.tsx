@@ -58,6 +58,7 @@ interface Product {
   description: string;
   image: string;
   is_premium: boolean;
+  section: 'staples' | 'farm_tools';
 }
 
 interface Customer {
@@ -70,7 +71,7 @@ interface Customer {
   lastOrder: string;
 }
 
-const EMPTY_PRODUCT = { name: '', price: '', category: '', description: '', image: '', is_premium: false };
+const EMPTY_PRODUCT = { name: '', price: '', category: '', description: '', image: '', is_premium: false, section: 'staples' as 'staples' | 'farm_tools' };
 
 // ── Admin Receipt (printable, all order types) ────────────────────
 
@@ -140,6 +141,7 @@ export default function AdminDashboard() {
   const [editingProduct, setEditingProduct]   = useState<Product | null>(null);
   const [productForm, setProductForm]         = useState<typeof EMPTY_PRODUCT>({ ...EMPTY_PRODUCT });
   const [savingProduct, setSavingProduct]     = useState(false);
+  const [productSectionFilter, setProductSectionFilter] = useState<'all' | 'staples' | 'farm_tools'>('all');
 
   const router = useRouter();
   const handlePrint = useReactToPrint({ contentRef: printRef });
@@ -202,7 +204,7 @@ export default function AdminDashboard() {
   const fetchProducts = async () => {
     try {
       setProductsLoading(true);
-      const res = await fetch('/api/products');
+      const res = await fetch('/api/products?section=all');
       if (!res.ok) throw new Error();
       setProducts(await res.json());
     } catch { toast.error('Could not load products'); }
@@ -212,7 +214,7 @@ export default function AdminDashboard() {
   const openNewProduct = () => { setEditingProduct(null); setProductForm({ ...EMPTY_PRODUCT }); setShowProductModal(true); };
   const openEditProduct = (p: Product) => {
     setEditingProduct(p);
-    setProductForm({ name: p.name, price: String(p.price), category: p.category, description: p.description, image: p.image, is_premium: p.is_premium });
+    setProductForm({ name: p.name, price: String(p.price), category: p.category, description: p.description, image: p.image, is_premium: p.is_premium, section: p.section ?? 'staples' });
     setShowProductModal(true);
   };
 
@@ -224,6 +226,7 @@ export default function AdminDashboard() {
       name: productForm.name, price: parseFloat(productForm.price as string),
       category: productForm.category.toUpperCase(), description: productForm.description,
       image: productForm.image || '/images/placeholder.jpg', is_premium: productForm.is_premium,
+      section: productForm.section,
     };
     try {
       const url    = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
@@ -496,6 +499,16 @@ export default function AdminDashboard() {
                 <Plus size={16} /> Add Product
               </button>
             </div>
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {(['all', 'staples', 'farm_tools'] as const).map(section => (
+                <button key={section} onClick={() => setProductSectionFilter(section)}
+                  aria-label={`Filter products by ${section}`}
+                  className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${productSectionFilter === section ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                >
+                  {section === 'all' ? 'All' : section === 'staples' ? 'Staples' : 'Farm Tools'}
+                </button>
+              ))}
+            </div>
             {productsLoading ? (
               <div className="py-20 text-center text-slate-500 font-bold">Loading catalog...</div>
             ) : products.length === 0 ? (
@@ -505,7 +518,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {products.map(product => (
+                {products.filter(p => productSectionFilter === 'all' || p.section === productSectionFilter).map(product => (
                   <div key={product.id} className="bg-[#121212] border border-white/5 rounded-[2rem] p-6 flex gap-6 items-center hover:border-amber-500/20 transition-all">
                     <div className="w-16 h-16 rounded-2xl bg-white/5 overflow-hidden shrink-0 relative">
                       {product.image ? (
@@ -518,6 +531,9 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-black uppercase text-sm truncate">{product.name}</h4>
                         {product.is_premium && <span className="bg-amber-500/20 text-amber-500 text-[8px] font-black px-2 py-0.5 rounded-full uppercase shrink-0">Premium</span>}
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase shrink-0 ${product.section === 'farm_tools' ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-slate-300'}`}>
+                          {product.section === 'farm_tools' ? 'Farm Tool' : 'Staple'}
+                        </span>
                       </div>
                       <p className="text-amber-500 text-xs font-bold uppercase">{product.category}</p>
                       <p className="text-slate-400 text-xs mt-1 truncate">{product.description}</p>
@@ -634,6 +650,15 @@ export default function AdminDashboard() {
                     <input type="text" value={productForm.category} onChange={e => setProductForm({ ...productForm, category: e.target.value })} placeholder="e.g. GARI"
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors placeholder:text-slate-600 font-medium uppercase" />
                   </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Storefront Section *</label>
+                  <select value={productForm.section} onChange={e => setProductForm({ ...productForm, section: e.target.value as 'staples' | 'farm_tools' })}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500 transition-colors font-medium">
+                    <option value="staples" className="bg-[#111]">Staples (Food Store)</option>
+                    <option value="farm_tools" className="bg-[#111]">Farm Tools</option>
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">Controls whether this shows up on the food store or the farm tools storefront</p>
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Description</label>

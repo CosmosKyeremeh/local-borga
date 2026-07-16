@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, price, category, description, image, is_premium, section } = body;
+    const { name, price, category, description, image, is_premium, section, stock_quantity } = body;
 
     if (!name || !price || !category) {
       return NextResponse.json(
@@ -61,8 +61,9 @@ export async function POST(request: Request) {
         category,
         description,
         image,
-        is_premium: is_premium ?? false,
-        section:    section ?? 'staples',
+        is_premium:     is_premium ?? false,
+        section:        section ?? 'staples',
+        stock_quantity: stock_quantity ?? 0,
       }])
       .select()
       .single();
