@@ -5,11 +5,15 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/src/lib/supabase/server';
 import { notify, messages } from '@/src/lib/notify';
+import { requireAdmin } from '@/src/lib/auth/admin';
 
 const toMessage = (err: unknown) =>
   err instanceof Error ? err.message : 'An unexpected error occurred';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = requireAdmin(request);
+  if (auth.ok === false) return NextResponse.json({ error: auth.message }, { status: auth.status });
+
   try {
     const supabase = createServerClient();
     const { data, error } = await supabase

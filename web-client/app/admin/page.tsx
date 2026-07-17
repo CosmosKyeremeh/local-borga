@@ -73,6 +73,11 @@ interface Customer {
 
 const EMPTY_PRODUCT = { name: '', price: '', category: '', description: '', image: '', is_premium: false, section: 'staples' as 'staples' | 'farm_tools' };
 
+const authHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('adminToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // ── Admin Receipt (printable, all order types) ────────────────────
 
 const AdminReceipt = ({ order, ref: receiptRef }: { order: Order; ref: React.Ref<HTMLDivElement> }) => (
@@ -164,11 +169,18 @@ export default function AdminDashboard() {
     router.push('/admin/login');
   };
 
+  const handleSessionExpired = () => {
+    localStorage.removeItem('adminToken');
+    toast.error('Session expired — please log in again');
+    router.push('/admin/login');
+  };
+
   // ── Orders ──────────────────────────────────────────────────────
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/orders');
+      const res = await fetch('/api/orders', { headers: authHeaders() });
+      if (res.status === 401 || res.status === 403) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error('Feed Offline');
       const raw: SupabaseOrderRow[] = await res.json();
       setOrders(raw.map(o => ({
@@ -193,9 +205,10 @@ export default function AdminDashboard() {
   const updateStatus = async (id: number, newStatus: string) => {
     try {
       const res = await fetch(`/api/orders/${id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ status: newStatus }),
       });
+      if (res.status === 401 || res.status === 403) { handleSessionExpired(); return; }
       if (res.ok) { toast.success(`#${id} → ${newStatus}`); fetchOrders(); }
     } catch { toast.error('Update Failed'); }
   };
@@ -231,7 +244,8 @@ export default function AdminDashboard() {
     try {
       const url    = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
       const method = editingProduct ? 'PATCH' : 'POST';
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) });
+      if (res.status === 401 || res.status === 403) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error();
       toast.success(editingProduct ? 'Product updated' : 'Product added');
       setShowProductModal(false);
@@ -243,7 +257,8 @@ export default function AdminDashboard() {
   const handleDeleteProduct = async (id: number, name: string) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE', headers: authHeaders() });
+      if (res.status === 401 || res.status === 403) { handleSessionExpired(); return; }
       if (!res.ok) throw new Error();
       toast.success(`${name} deleted`);
       fetchProducts();

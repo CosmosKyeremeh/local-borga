@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/src/lib/supabase/server';
+import { requireAdmin } from '@/src/lib/auth/admin';
 
 const toMessage = (err: unknown) =>
   err instanceof Error ? err.message : 'An unexpected error occurred';
@@ -41,6 +42,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = requireAdmin(request);
+  if (auth.ok === false) return NextResponse.json({ error: auth.message }, { status: auth.status });
+
   try {
     const body = await request.json();
     const { name, price, category, description, image, is_premium, section, stock_quantity } = body;
