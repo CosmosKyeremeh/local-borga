@@ -2,7 +2,7 @@
 
 // web-client/app/page.tsx
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useReactToPrint } from 'react-to-print';
 import { supabaseBrowser } from '@/src/lib/supabase/browser';
 import { useCart } from '@/src/context/CartContext';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -54,8 +53,8 @@ interface CompletedOrder {
 
 // ── Receipt Component (printable for ALL order types) ───────────────
 
-const OrderReceipt = ({ order, ref: receiptRef }: { order: CompletedOrder; ref: React.Ref<HTMLDivElement> }) => (
-  <div ref={receiptRef as React.RefObject<HTMLDivElement>}
+const OrderReceipt = ({ order }: { order: CompletedOrder }) => (
+  <div id="print-receipt"
     className="p-8 w-[380px] bg-white text-black font-mono"
     style={{ fontFamily: 'monospace' }}
   >
@@ -167,10 +166,6 @@ export default function Home() {
   const [demoCardNum, setDemoCardNum] = useState('');
   const [demoExpiry, setDemoExpiry]   = useState('');
   const [demoCvv, setDemoCvv]         = useState('');
-
-  // Receipt printing
-  const receiptRef = useRef<HTMLDivElement>(null);
-  const handlePrintReceipt = useReactToPrint({ contentRef: receiptRef });
 
   // ── Auth session ─────────────────────────────────────────────────
   useEffect(() => {
@@ -500,7 +495,7 @@ export default function Home() {
         <section id="catalog" className="mb-24">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
             <h2 className="text-4xl font-black uppercase tracking-tight text-slate-900 underline decoration-amber-500 decoration-4 underline-offset-8">The Collection</h2>
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex gap-2 overflow-x-auto pb-2 w-full min-w-0 md:w-auto">
               {categories.map(cat => (
                 <button key={cat} onClick={() => setSelectedCategory(cat)}
                   className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
@@ -862,7 +857,7 @@ export default function Home() {
                   </div>
 
                   {/* Print receipt button */}
-                  <button onClick={() => handlePrintReceipt()}
+                  <button onClick={() => window.print()}
                     className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest hover:bg-amber-500 hover:text-black transition-all flex items-center justify-center gap-2 mb-3"
                   >
                     <Printer size={16} /> Print Receipt
@@ -892,7 +887,7 @@ export default function Home() {
 
       {/* Hidden printable receipt */}
       <div className="hidden print:block">
-        {completedOrder && <OrderReceipt order={completedOrder} ref={receiptRef} />}
+        {completedOrder && <OrderReceipt order={completedOrder} />}
       </div>
 
       {/* ══════════════ CUSTOM MILLING MODAL ══════════════ */}

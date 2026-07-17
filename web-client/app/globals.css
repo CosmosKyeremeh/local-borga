@@ -76,3 +76,22 @@ body {
 *:hover {
   scrollbar-color: #f59e0b transparent;
 }
+
+/* ── Print isolation — show only the order receipt when printing ── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #print-receipt,
+  #print-receipt * {
+    visibility: visible;
+  }
+
+  #print-receipt {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
