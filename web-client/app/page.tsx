@@ -343,7 +343,7 @@ export default function Home() {
 
       {/* ── NAVBAR ── */}
       <motion.nav initial={{ y: -100 }} animate={{ y: 0 }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-4"
+        className="print:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-4"
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-3">
@@ -410,7 +410,7 @@ export default function Home() {
         </AnimatePresence>
       </motion.nav>
 
-      <div className="max-w-7xl mx-auto px-6 pt-32 pb-16">
+      <div className="print:hidden max-w-7xl mx-auto px-6 pt-32 pb-16">
 
         {/* ── HERO ── */}
         <section className="mb-24">
@@ -575,7 +575,7 @@ export default function Home() {
       {/* ══════════════ CART DRAWER ══════════════ */}
       <AnimatePresence>
         {isCartOpen && (
-          <div className="fixed inset-0 z-[100] flex justify-end">
+          <div className="print:hidden fixed inset-0 z-[100] flex justify-end">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
@@ -649,7 +649,7 @@ export default function Home() {
       {/* ══════════════ CHECKOUT MODAL ══════════════ */}
       <AnimatePresence>
         {isCheckoutOpen && (
-          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="print:hidden fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
               onClick={() => checkoutStep !== 'success' && setIsCheckoutOpen(false)} />
@@ -893,7 +893,7 @@ export default function Home() {
       {/* ══════════════ CUSTOM MILLING MODAL ══════════════ */}
       <AnimatePresence>
         {isCustomModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="print:hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsCustomModalOpen(false)} />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
